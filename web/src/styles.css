@@ -1,0 +1,1075 @@
+/* Cashflows — единый файл стилей (CSS-переменные). Светлая тема по умолчанию,
+   тёмная — через [data-theme="dark"] на <html> (App.tsx/useTheme, сохраняется в localStorage). */
+
+:root {
+    color-scheme: light;
+    --bg: #f4f6f9;
+    --bg-panel: #ffffff;
+    --bg-panel-2: #eef1f5;
+    --bg-input: #ffffff;
+    --border: #dbe1e8;
+    --border-strong: #b9c2cc;
+    --text: #1b232c;
+    --text-muted: #5b6b78;
+    --income: #1f9254;
+    --income-soft: rgba(31, 146, 84, 0.12);
+    --expense: #c9362b;
+    --expense-soft: rgba(201, 54, 43, 0.1);
+    --accent: #2f6fed;
+    --accent-soft: rgba(47, 111, 237, 0.1);
+    --warning: #a06509;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(15, 23, 33, 0.08);
+    --chart-1: #2f6fed;
+    --chart-2: #1f9254;
+    --chart-3: #af7a09;
+    --chart-4: #c9362b;
+    --chart-5: #7c4fd1;
+    --chart-6: #12879a;
+    --chart-7: #b23a86;
+    --chart-8: #7a5300;
+    --chart-rest: #8a97a3;
+}
+
+:root[data-theme='dark'] {
+    color-scheme: dark;
+    --bg: #0f1419;
+    --bg-panel: #171d24;
+    --bg-panel-2: #1d252e;
+    --bg-input: #232c37;
+    --border: #2c3743;
+    --border-strong: #465262;
+    --text: #e6ebf1;
+    --text-muted: #8b98a5;
+    --income: #3fb970;
+    --income-soft: rgba(63, 185, 112, 0.16);
+    --expense: #e5534b;
+    --expense-soft: rgba(229, 83, 75, 0.16);
+    --accent: #4c8dff;
+    --accent-soft: rgba(76, 141, 255, 0.14);
+    --warning: #d29922;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    --chart-1: #4c8dff;
+    --chart-2: #3fb970;
+    --chart-3: #d29922;
+    --chart-4: #e5534b;
+    --chart-5: #ab7df8;
+    --chart-6: #39c5cf;
+    --chart-7: #f778ba;
+    --chart-8: #9e6a03;
+    --chart-rest: #566570;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family:
+        -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    transition:
+        background-color 0.15s ease,
+        color 0.15s ease;
+}
+
+#root {
+    min-height: 100vh;
+}
+
+.app {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 0 16px 24px;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* --- Шапка и табы --- */
+
+.app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 18px;
+}
+
+.app-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.app-title h1 {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+}
+
+.app-logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.app-header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.tabs {
+    display: flex;
+    gap: 6px;
+}
+
+.theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--border);
+    background: var(--bg-panel-2);
+    color: var(--text);
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.theme-toggle:hover {
+    border-color: var(--accent);
+}
+
+.tab {
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.tab:hover {
+    color: var(--text);
+    background: var(--bg-panel-2);
+}
+
+.tab-active {
+    background: var(--accent-soft);
+    border-color: var(--border);
+    color: var(--text);
+}
+
+.app-main {
+    flex: 1;
+}
+
+.app-footer {
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+/* --- Панели и секции --- */
+
+.panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.panel h2 {
+    margin: 0 0 12px;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.panel-head h2 {
+    margin: 0;
+}
+
+.collapsible-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0 0 12px;
+    cursor: pointer;
+    text-align: left;
+    color: inherit;
+    font: inherit;
+}
+
+.collapsible-header h2 {
+    margin: 0;
+}
+
+.collapsible-chevron {
+    display: inline-block;
+    color: var(--text-muted);
+    transition: transform 0.15s ease;
+    flex-shrink: 0;
+}
+
+.collapsible-chevron-open {
+    transform: rotate(90deg);
+}
+
+.collapsible-body {
+    animation: collapsible-open 0.15s ease;
+}
+
+@keyframes collapsible-open {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.income-compact {
+    color: var(--text-muted);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+}
+
+.grid-2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.grid-2>.panel {
+    margin-bottom: 0;
+}
+
+/* --- KPI-карточки --- */
+
+.kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.kpi {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 14px 16px;
+}
+
+.kpi-label {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.kpi-value {
+    font-size: 24px;
+    font-weight: 700;
+    margin: 4px 0 2px;
+    font-variant-numeric: tabular-nums;
+}
+
+.kpi-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.kpi-delta {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+}
+
+.kpi-delta-up {
+    color: var(--income);
+    background: var(--income-soft);
+}
+
+.kpi-delta-down {
+    color: var(--expense);
+    background: var(--expense-soft);
+}
+
+.kpi-delta-flat {
+    color: var(--text-muted);
+    background: var(--bg-panel-2);
+}
+
+.kpi-value-income {
+    color: var(--income);
+}
+
+.kpi-value-expense {
+    color: var(--expense);
+}
+
+/* Займы (сколько должны пользователю) — справочная цифра, не доход и не расход,
+   поэтому нейтральный серый, а не income/expense зелёный-красный. */
+.kpi-value-muted {
+    color: var(--text-muted);
+}
+
+/* --- WeekSwitcher --- */
+
+.week-switcher {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.week-switcher-label {
+    font-size: 15px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+.btn {
+    border: 1px solid var(--border);
+    background: var(--bg-panel-2);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 7px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.btn:hover:not(:disabled) {
+    border-color: var(--accent);
+}
+
+.btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.btn-icon {
+    width: 34px;
+    padding: 6px 0;
+    text-align: center;
+    font-size: 15px;
+}
+
+.btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+.btn-danger {
+    background: transparent;
+    border-color: var(--border);
+    color: var(--expense);
+}
+
+.btn-danger:hover:not(:disabled) {
+    border-color: var(--expense);
+}
+
+.btn-small {
+    padding: 4px 10px;
+    font-size: 12px;
+}
+
+/* --- Статусы загрузки --- */
+
+.state-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 40px 16px;
+    color: var(--text-muted);
+}
+
+.state-error {
+    color: var(--expense);
+}
+
+.spinner {
+    width: 26px;
+    height: 26px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* --- Сообщения --- */
+
+.message {
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    margin: 10px 0;
+    border: 1px solid transparent;
+}
+
+.message-error {
+    background: var(--expense-soft);
+    border-color: var(--expense);
+    color: var(--text);
+}
+
+.message-error b {
+    color: var(--expense);
+}
+
+.message-success {
+    background: var(--income-soft);
+    border-color: var(--income);
+}
+
+.message ul {
+    margin: 6px 0 0;
+    padding-left: 18px;
+}
+
+/* --- Обзор месяца --- */
+
+/* --- Группировка строк матрицы обзора месяца по CategoryField ---
+   Заголовок группы — акцентный фон + верхняя граница-«разделитель секций» (двойная,
+   чтобы точно не путать с тонкими/толстыми разделителями КОЛОНОК на той же таблице,
+   у них другая ось — border-left). Строки внутри группы — едва заметная тонировка
+   фона (color-mix, 4%), чтобы группа читалась одним блоком; строка «Итого» —
+   акцентная, как заголовок, замыкает блок. */
+
+.month-overview-group-header td {
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 10px 14px;
+    border-top: 3px double var(--accent);
+    border-bottom: 1px solid var(--border);
+}
+
+.month-overview-row-grouped td {
+    background: color-mix(in srgb, var(--accent) 4%, transparent);
+}
+
+.month-overview-subtotal-row td {
+    font-weight: 800;
+    background: var(--accent-soft);
+    border-top: 1px solid var(--border-strong);
+    border-bottom: 2px solid var(--accent);
+}
+
+/* Заливка ВСЕЙ строки — инлайн, планRowBackground() в MonthOverview.tsx (красный,
+   непрерывно нарастает с % от плана, от 50% и выше; ниже — без заливки). Здесь —
+   только начертание САМОЙ цифры «% от плана» при переросходе (>=100%), для читаемости
+   поверх насыщенного фона строки. */
+.month-overview-plan-status-over {
+    font-weight: 700;
+    color: var(--expense);
+}
+
+/* Категория + План — «идентификационная» зона (что это и сколько задумано), всегда
+   отличимая от недель (факт) слабой тонировкой ПОВЕРХ фона строки — box-shadow, а не
+   background, поэтому не спорит по specificity с покраской группы/итого/переросхода
+   (planRowBackground) и остаётся видимой в любом состоянии строки. */
+.month-overview-col-identity {
+    box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+/* Границы столбцов: базовая линия между соседними неделями — едва заметная (var(--border)). */
+.month-overview-col-week {
+    border-left: 1px solid var(--border);
+}
+
+/* На входе в «идентификационную» зону (План) и на выходе из недель (% от плана) —
+   плотная (var(--border-strong)), чтобы Категория/План и недели читались двумя разными
+   блоками, а не одной сплошной лентой цифр. .month-overview-col-week-start переопределяет
+   тонкую границу первой недели — идёт ПОСЛЕ .month-overview-col-week по каскаду
+   (тот же селектор по специфичности, побеждает порядок объявления). */
+.month-overview-col-plan,
+.month-overview-col-status,
+.month-overview-col-week-start {
+    border-left: 1px solid var(--border-strong);
+}
+
+/* Ненулевая/нулевая недельная сумма — кнопка на всю ячейку (открывает WeekOperationsDialog
+   со списком операций, включая «0 ₽» — пустой список тоже корректный ответ): растягивается
+   на padding родительского td отрицательными отступами, чтобы подсветка при наведении
+   покрывала всю ячейку, а не только текст. */
+.month-overview-cell-btn {
+    display: block;
+    width: calc(100% + 28px);
+    margin: -10px -14px;
+    padding: 10px 14px;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    color: inherit;
+    text-align: right;
+    cursor: pointer;
+}
+
+/* Нулевая неделя — приглушённый цвет (чтобы ненулевые траты не терялись в цепочке
+   «0 ₽» через всю строку), но остаётся кликабельной кнопкой наравне с остальными —
+   селектор с двумя классами специфичнее базового .month-overview-cell-btn, чтобы
+   этот color гарантированно победил в каскаде независимо от порядка в файле. */
+.month-overview-cell-btn.month-overview-zero {
+    color: var(--text-muted);
+}
+
+.month-overview-cell-btn:hover,
+.month-overview-cell-btn:focus-visible {
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+/* --- Донат и легенда --- */
+
+.donut-wrap {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.donut-legend {
+    flex: 1;
+    min-width: 200px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 13px;
+}
+
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    margin-top: 4px;
+    flex-shrink: 0;
+}
+
+.legend-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.legend-name {
+    overflow-wrap: break-word;
+}
+
+.legend-value {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+}
+
+/* --- Импорт --- */
+
+.dropzone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 26px 16px;
+    text-align: center;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition:
+        border-color 0.15s ease,
+        background 0.15s ease;
+}
+
+.dropzone:hover,
+.dropzone-active {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}
+
+.import-stats {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+    font-variant-numeric: tabular-nums;
+}
+
+.import-stat b {
+    font-size: 16px;
+}
+
+.import-stat span {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+/* --- Формы --- */
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.field label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.field input,
+.field select,
+.input-control {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-family: inherit;
+}
+
+.field input:focus,
+.field select:focus,
+.input-control:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.form-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+}
+
+/* --- Постоянные/переменные расходы (ExpenseKindSummary) --- */
+
+.kind-bar {
+    display: flex;
+    gap: 2px;
+    height: 14px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--bg-panel-2);
+    margin-bottom: 14px;
+}
+
+.kind-bar-segment {
+    height: 100%;
+    min-width: 2px;
+}
+
+.kind-bar-segment-fixed {
+    background: var(--chart-1);
+}
+
+.kind-bar-segment-variable {
+    background: var(--chart-8);
+}
+
+.kind-bar-segment-reserve {
+    background: var(--chart-3);
+}
+
+.kind-bar-segment-unclassified {
+    background-color: var(--chart-rest);
+    background-image: repeating-linear-gradient(
+        45deg,
+        rgba(255, 255, 255, 0.16) 0,
+        rgba(255, 255, 255, 0.16) 3px,
+        transparent 3px,
+        transparent 7px
+    );
+}
+
+.kind-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.kind-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.kind-legend-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.kind-hint {
+    margin: 12px 0 0;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+/* --- Списки сущностей --- */
+
+.entity-list {
+    margin-top: 14px;
+}
+
+.entity-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+}
+
+.entity-item:first-child {
+    border-top: none;
+}
+
+/* Заголовок группы по сфере (category_abstract) — CategoryKindsSection, аналог группировки
+   строк по сфере в MonthOverview (.month-overview-group-header), но для списка, не таблицы. */
+.entity-group-header {
+    margin-top: 18px;
+    padding: 8px 10px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border-radius: 6px;
+}
+
+.entity-group-header + .entity-item {
+    border-top: none;
+}
+
+.entity-main {
+    flex: 1;
+    min-width: 220px;
+}
+
+.entity-title {
+    font-weight: 600;
+}
+
+.category-field-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.category-field-row .input-control {
+    max-width: 260px;
+    padding: 5px 8px;
+    font-size: 12px;
+}
+
+.entity-sub {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.entity-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.muted {
+    color: var(--text-muted);
+}
+
+.empty {
+    color: var(--text-muted);
+    font-style: italic;
+    padding: 8px 0;
+}
+
+/* --- Таблица операций --- */
+
+.filters-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.table-wrap {
+    overflow-x: auto;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.table th {
+    text-align: left;
+    color: var(--text-muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+
+.table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+}
+
+.table tbody tr:hover {
+    background: var(--bg-panel-2);
+}
+
+.table-amount-right {
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.amount-expense {
+    color: var(--expense);
+}
+
+.amount-income {
+    color: var(--income);
+}
+
+.table-badge {
+    display: inline-block;
+    font-size: 11px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--bg-input);
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.table-badge-off {
+    background: var(--warning);
+    color: #1a1a1a;
+    font-weight: 700;
+}
+
+.cell-description {
+    max-width: 340px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* --- SearchableSelect (комбобокс с текстовым поиском вместо нативного select) ---
+   Список — position:fixed (не в потоке), координаты из getBoundingClientRect инпута
+   (см. компонент) — иначе обрезался бы overflow:auto у .table-wrap/.modal-wide. */
+
+.searchable-select {
+    position: relative;
+}
+
+.searchable-select-list {
+    position: fixed;
+    z-index: 200;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    max-height: 260px;
+    overflow-y: auto;
+    margin: 0;
+    padding: 4px;
+    list-style: none;
+}
+
+.searchable-select-option {
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.searchable-select-option.is-highlighted {
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+.searchable-select-option.is-selected {
+    font-weight: 600;
+}
+
+.searchable-select-option.is-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.searchable-select-empty {
+    padding: 6px 8px;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+/* --- Диалог подтверждения (ConfirmDialog вместо window.confirm) --- */
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 16px;
+}
+
+.modal {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 18px;
+    max-width: 420px;
+    width: 100%;
+}
+
+.modal-wide {
+    max-width: 960px;
+    max-height: 84vh;
+    overflow-y: auto;
+}
+
+.modal-title {
+    margin: 0 0 8px;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.modal-description {
+    margin: 0 0 14px;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.pager {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 12px;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+/* --- Адаптив --- */
+
+@media (max-width: 640px) {
+    .app-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .tabs {
+        justify-content: stretch;
+    }
+
+    .tab {
+        flex: 1;
+    }
+
+    .kpi-value {
+        font-size: 20px;
+    }
+}
