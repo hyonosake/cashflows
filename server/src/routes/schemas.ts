@@ -5,6 +5,8 @@ import { z } from 'zod';
  * Деньги — целые копейки (безопасные целые), периоды — ISO-форматы.
  */
 
+// --- общие (переиспользуются несколькими сущностями) ---
+
 export const isoDateSchema = z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'ожидается дата в формате YYYY-MM-DD');
@@ -15,6 +17,13 @@ export const moneyKopecksSchema = z
     .number({ invalid_type_error: 'ожидается целое число копеек' })
     .int('сумма должна быть целым числом копеек')
     .safe('сумма выходит за пределы безопасного целого');
+
+/** :id в пути — goals, custom-mappings, PUT /operations/:id/category. */
+export const idParamSchema = z.object({
+    id: z.coerce.number().int().positive('id должен быть положительным целым'),
+});
+
+// --- operations ---
 
 export const operationsQuerySchema = z.object({
     from: isoDateSchema.optional(),
@@ -31,25 +40,21 @@ export const operationsQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(200).optional(),
 });
 
+export const operationCategoryInputSchema = z.object({
+    categoryUser: z.string().trim().min(1, 'categoryUser обязателен и не может быть пустым'),
+});
+
+// --- goals ---
+
 export const goalInputSchema = z.object({
     name: z.string().trim().min(1, 'name обязателен и не может быть пустым'),
     amountKopecks: moneyKopecksSchema.positive('amountKopecks должен быть > 0'),
 });
 
-export const operationCategoryInputSchema = z.object({
-    categoryUser: z.string().trim().min(1, 'categoryUser обязателен и не может быть пустым'),
-});
-
-export const idParamSchema = z.object({
-    id: z.coerce.number().int().positive('id должен быть положительным целым'),
-});
+// --- categories (core CRUD + kinds + limits) ---
 
 export const categoryParamSchema = z.object({
     category: z.string().trim().min(1, 'category обязателен'),
-});
-
-export const mccParamSchema = z.object({
-    mcc: z.string().trim().regex(/^\d{4}$/, 'mcc должен быть 4-значным кодом'),
 });
 
 export const userCategoryInputSchema = z.object({
@@ -66,16 +71,14 @@ export const categoryKindInputSchema = z.object({
     kind: z.enum(['fixed', 'variable', 'reserve']).nullable(),
 });
 
-export const categoryFieldInputSchema = z.object({
-    field: z.string().trim().min(1, 'field не может быть пустой строкой').nullable(),
-});
-
-export const categoryAreaInputSchema = z.object({
-    name: z.string().trim().min(1, 'name обязателен и не может быть пустым'),
-});
-
 export const categoryLimitInputSchema = z.object({
     monthLimitKopecks: moneyKopecksSchema.positive('monthLimitKopecks должен быть > 0').nullable(),
+});
+
+// --- category mappings (mcc-mappings / custom-mappings) ---
+
+export const mccParamSchema = z.object({
+    mcc: z.string().trim().regex(/^\d{4}$/, 'mcc должен быть 4-значным кодом'),
 });
 
 export const mcMappingInputSchema = z.object({
@@ -88,15 +91,27 @@ export const customMappingInputSchema = z.object({
     targetCategory: z.string().trim().min(1, 'targetCategory обязательна и не может быть пустой'),
 });
 
+// --- category areas (сферы) ---
+
+export const categoryFieldInputSchema = z.object({
+    field: z.string().trim().min(1, 'field не может быть пустой строкой').nullable(),
+});
+
+export const categoryAreaInputSchema = z.object({
+    name: z.string().trim().min(1, 'name обязателен и не может быть пустым'),
+});
+
+// --- merchants ---
+
 export const merchantCategoryInputSchema = z.object({
     merchant: z.string().trim().min(1, 'merchant обязателен и не может быть пустым'),
     targetCategory: z.string().trim().min(1, 'targetCategory обязательна и не может быть пустой'),
 });
+
+// --- settings ---
 
 export const settingsInputSchema = z.object({
     salaryDays: z.array(z.number().int().min(1).max(31)).max(31, 'не больше 31 дня'),
     salaryAmountKopecks: moneyKopecksSchema.positive('salaryAmountKopecks должен быть > 0').nullable(),
     owedToUserKopecks: moneyKopecksSchema.positive('owedToUserKopecks должен быть > 0').nullable(),
 });
-
-export type OperationsQueryParsed = z.infer<typeof operationsQuerySchema>;
