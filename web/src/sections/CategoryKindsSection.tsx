@@ -9,16 +9,18 @@ import {
     setCategoryKind,
     setCategoryLimit,
 } from '../api';
-import { formatMoneyWhole, kopecksToRublesInput, parseRublesToKopecks } from '../format';
+import { kopecksToRublesInput, parseRublesToKopecks } from '../format';
 import { useCategoryAreas } from '../hooks/useCategoryAreas';
 import { useCategoryFields } from '../hooks/useCategoryFields';
 import { useCategoryKinds } from '../hooks/useCategoryKinds';
 import { useCategoryLimits } from '../hooks/useCategoryLimits';
+import { useConfirmDelete } from '../hooks/useConfirmDelete';
 import { CollapsibleSection } from '../components/ui/CollapsibleSection';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { ErrorBanner } from '../components/ui/ErrorBanner';
-import { SearchableSelect } from '../components/ui/SearchableSelect';
 import { Spinner } from '../components/ui/Spinner';
+import { CategoryRow } from './category-kinds/CategoryRow';
+import { InlineNameForm } from './category-kinds/InlineNameForm';
 
 /**
  * Секция «Настройки категорий» — тег «постоянная/переменная» на категорию (для разбивки
@@ -55,13 +57,6 @@ interface Props {
     version: number;
     onDataChanged: () => void;
 }
-
-const OPTIONS: Array<{ value: CategoryKind | null; label: string }> = [
-    { value: 'fixed', label: 'Постоянная' },
-    { value: 'variable', label: 'Переменная' },
-    { value: 'reserve', label: 'Резерв' },
-    { value: null, label: '—' },
-];
 
 export function CategoryKindsSection({ version, onDataChanged }: Props): JSX.Element {
     const kindsQuery = useCategoryKinds(version);
@@ -112,9 +107,8 @@ export function CategoryKindsSection({ version, onDataChanged }: Props): JSX.Ele
     const [creatingCategory, setCreatingCategory] = useState(false);
     const [newAreaName, setNewAreaName] = useState('');
     const [creatingArea, setCreatingArea] = useState(false);
-    const [pendingDeleteCategory, setPendingDeleteCategory] = useState<string | null>(null);
-    const [deletingCategory, setDeletingCategory] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const categoryDelete = useConfirmDelete<string>();
 
     const handleCreateCategory = async (): Promise<void> => {
         const name = newCategoryName.trim();
@@ -154,7 +148,7 @@ export function CategoryKindsSection({ version, onDataChanged }: Props): JSX.Ele
         }
     };
 
-    const handleSet = async (category: string, kind: CategoryKind | null): Promise<void> => {
+    const handleSetKind = async (category: string, kind: CategoryKind | null): Promise<void> => {
         setBusyCategory(category);
         setError(null);
         try {
@@ -181,16 +175,12 @@ export function CategoryKindsSection({ version, onDataChanged }: Props): JSX.Ele
     };
 
     const handleDeleteCategory = async (category: string): Promise<void> => {
-        setDeletingCategory(true);
-        setError(null);
         try {
             await deleteUserCategory(category);
-            setPendingDeleteCategory(null);
             onDataChanged();
         } catch (e: unknown) {
             setError(apiErrorText(e, 'Не удалось удалить категорию'));
-        } finally {
-            setDeletingCategory(false);
+            throw e;
         }
     };
 
@@ -245,53 +235,27 @@ export function CategoryKindsSection({ version, onDataChanged }: Props): JSX.Ele
             {limitsQuery.error !== null && <ErrorBanner message={limitsQuery.error} />}
             {areasQuery.error !== null && <ErrorBanner message={areasQuery.error} />}
 
-            <form
-                className="form-grid"
-                style={{ marginBottom: 16, alignItems: 'end' }}
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    void handleCreateCategory();
-                }}
-            >
-                <div className="field">
-                    <label htmlFor="new-category-name">Новая категория</label>
-                    <input
-                        id="new-category-name"
-                        className="input-control"
-                        value={newCategoryName}
-                        disabled={creatingCategory}
-                        onChange={(e) => setNewCategoryName(e.target.value)}
-                        placeholder="Например «Подарки»"
-                    />
-                </div>
-                <button type="submit" className="btn btn-primary" disabled={creatingCategory}>
-                    Добавить категорию
-                </button>
-            </form>
+            <InlineNameForm
+                id="new-category-name"
+                label="Новая категория"
+                placeholder="Например «Подарки»"
+                value={newCategoryName}
+                onChange={setNewCategoryName}
+                submitting={creatingCategory}
+                submitLabel="Добавить категорию"
+                onSubmit={() => void handleCreateCategory()}
+            />
 
-            <form
-                className="form-grid"
-                style={{ marginBottom: 16, alignItems: 'end' }}
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    void handleCreateArea();
-                }}
-            >
-                <div className="field">
-                    <label htmlFor="new-area-name">Новая сфера</label>
-                    <input
-                        id="new-area-name"
-                        className="input-control"
-                        value={newAreaName}
-                        disabled={creatingArea}
-                        onChange={(e) => setNewAreaName(e.target.value)}
-                        placeholder="Например «Еда и повседневное»"
-                    />
-                </div>
-                <button type="submit" className="btn btn-primary" disabled={creatingArea}>
-                    Добавить сферу
-                </button>
-            </form>
+            <InlineNameForm
+                id="new-area-name"
+                label="Новая сфера"
+                placeholder="Например «Еда и повседневное»"
+                value={newAreaName}
+                onChange={setNewAreaName}
+                submitting={creatingArea}
+                submitLabel="Добавить сферу"
+                onSubmit={() => void handleCreateArea()}
+            />
 
             {listLoading ? (
                 <div className="state-box">
@@ -307,7 +271,6 @@ export function CategoryKindsSection({ version, onDataChanged }: Props): JSX.Ele
                             {group.items.map((item) => {
                                 const hasField = fieldByCategory.has(item.category);
                                 const savedField = fieldByCategory.get(item.category) ?? '';
-
                                 const savedLimit = limitByCategory.get(item.category) ?? null;
                                 const limitDraft =
                                     limitDrafts[item.category] ?? (savedLimit === null ? '' : kopecksToRublesInput(savedLimit));
@@ -315,67 +278,27 @@ export function CategoryKindsSection({ version, onDataChanged }: Props): JSX.Ele
                                 const limitChanged = limitDraft.trim() !== savedLimitDraft;
 
                                 return (
-                                    <div className="entity-item" key={item.category}>
-                                        <div className="entity-main">
-                                            <div className="entity-title">{item.category}</div>
-                                            {hasField && (
-                                                <div className="category-field-row">
-                                                    <SearchableSelect
-                                                        value={savedField ?? ''}
-                                                        options={areaOptions}
-                                                        disabled={busyFieldCategory === item.category}
-                                                        aria-label={`Сфера категории ${item.category}`}
-                                                        onChange={(next) => void handleSetField(item.category, next)}
-                                                    />
-                                                </div>
-                                            )}
-                                            <div className="category-field-row">
-                                                <input
-                                                    className="input-control"
-                                                    placeholder="План на месяц, ₽ (напр. «15000»)"
-                                                    value={limitDraft}
-                                                    disabled={busyLimitCategory === item.category}
-                                                    onChange={(e) =>
-                                                        setLimitDrafts((prev) => ({ ...prev, [item.category]: e.target.value }))
-                                                    }
-                                                />
-                                                {limitChanged && (
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-small"
-                                                        disabled={busyLimitCategory === item.category}
-                                                        onClick={() => void handleSaveLimit(item.category)}
-                                                    >
-                                                        Сохранить
-                                                    </button>
-                                                )}
-                                                {savedLimit !== null && !limitChanged && (
-                                                    <span className="muted">{formatMoneyWhole(savedLimit)}/мес</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="entity-actions">
-                                            {OPTIONS.map((option) => (
-                                                <button
-                                                    key={option.label}
-                                                    type="button"
-                                                    className={`btn btn-small${item.kind === option.value ? ' btn-primary' : ''}`}
-                                                    disabled={busyCategory === item.category}
-                                                    onClick={() => void handleSet(item.category, option.value)}
-                                                >
-                                                    {option.label}
-                                                </button>
-                                            ))}
-                                            <button
-                                                type="button"
-                                                className="btn btn-small btn-danger"
-                                                disabled={deletingCategory}
-                                                onClick={() => setPendingDeleteCategory(item.category)}
-                                            >
-                                                Удалить
-                                            </button>
-                                        </div>
-                                    </div>
+                                    <CategoryRow
+                                        key={item.category}
+                                        item={item}
+                                        hasField={hasField}
+                                        savedField={savedField ?? ''}
+                                        areaOptions={areaOptions}
+                                        fieldBusy={busyFieldCategory === item.category}
+                                        onSetField={(field) => void handleSetField(item.category, field)}
+                                        savedLimit={savedLimit}
+                                        limitDraft={limitDraft}
+                                        limitChanged={limitChanged}
+                                        limitBusy={busyLimitCategory === item.category}
+                                        onLimitDraftChange={(value) =>
+                                            setLimitDrafts((prev) => ({ ...prev, [item.category]: value }))
+                                        }
+                                        onSaveLimit={() => void handleSaveLimit(item.category)}
+                                        kindBusy={busyCategory === item.category}
+                                        onSetKind={(kind) => void handleSetKind(item.category, kind)}
+                                        deleteBusy={categoryDelete.busy}
+                                        onRequestDelete={() => categoryDelete.requestDelete(item.category)}
+                                    />
                                 );
                             })}
                         </div>
@@ -384,15 +307,13 @@ export function CategoryKindsSection({ version, onDataChanged }: Props): JSX.Ele
             )}
 
             <ConfirmDialog
-                open={pendingDeleteCategory !== null}
-                title={`Удалить категорию «${pendingDeleteCategory ?? ''}»?`}
+                open={categoryDelete.pending !== null}
+                title={`Удалить категорию «${categoryDelete.pending ?? ''}»?`}
                 description="Операции, мерчанты и правила (MCC/сообщение), ссылавшиеся только на эту категорию, станут «Без категории». Действие необратимо."
                 confirmLabel="Удалить"
-                busy={deletingCategory}
-                onCancel={() => setPendingDeleteCategory(null)}
-                onConfirm={() => {
-                    if (pendingDeleteCategory !== null) void handleDeleteCategory(pendingDeleteCategory);
-                }}
+                busy={categoryDelete.busy}
+                onCancel={categoryDelete.cancel}
+                onConfirm={() => void categoryDelete.confirm(handleDeleteCategory)}
             />
         </CollapsibleSection>
     );
