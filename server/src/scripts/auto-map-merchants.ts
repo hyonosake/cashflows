@@ -1,5 +1,7 @@
 import { loadConfig } from '../config.js';
 import { openDb, type Db } from '../db.js';
+import { listUserCategories } from '../domain/categories.js';
+import { setMerchantCategory } from '../domain/merchants.js';
 
 /**
  * `npm run auto-map` — авторазметка «очевидных» мерчантов (PLANS.md, «Умный маппинг категорий»,
@@ -69,10 +71,7 @@ interface Proposal {
 }
 
 function buildProposals(db: Db): { proposals: Proposal[]; unmatched: MerchantAgg[] } {
-    const existingCategories = db
-        .prepare<[], { name: string }>("SELECT name FROM user_categories WHERE name != 'Без категории'")
-        .all()
-        .map((r) => r.name);
+    const existingCategories = listUserCategories(db);
 
     const merchants = db
         .prepare<[], MerchantAgg>(
@@ -125,11 +124,8 @@ function main(): void {
         }
 
         if (apply && proposals.length > 0) {
-            const update = db.prepare(
-                'UPDATE merchants SET user_category_id = (SELECT id FROM user_categories WHERE name = ?) WHERE name = ?',
-            );
             db.transaction(() => {
-                for (const p of proposals) update.run(p.targetCategory, p.merchant);
+                for (const p of proposals) setMerchantCategory(db, p.merchant, p.targetCategory);
             })();
             console.log(`\nПроставлено ${proposals.length} мерчантов — категории уже видны везде (живой JOIN, пересчёт не нужен).`);
         }
