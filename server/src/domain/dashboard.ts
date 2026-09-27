@@ -1,24 +1,13 @@
 import type { Db } from '../db.js';
-import { getOwedToUserKopecks, getSalaryAmountKopecks, getSalaryDays } from './settings.js';
 import { listGoals } from './goals.js';
-import {
-    daysBetween,
-    detectPeriodType,
-    monthBounds,
-    monthKey,
-    moscowTodayIso,
-    nextSalaryDate,
-    previousPeriod,
-    weeksOfMonth,
-} from './periods.js';
-import type { MonthWeek } from './periods.js';
+import { AGG_FILTER } from './queryFilters.js';
+import { detectPeriodType, previousPeriod } from './periodResolution.js';
+import { buildMonthOverview } from './monthOverview.js';
 import type {
     CategoryKind,
     CategorySliceDto,
     DashboardDto,
     ExpenseByKindDto,
-    MonthOverviewCategoryDto,
-    MonthOverviewDto,
     PeriodTotalsDto,
 } from '../../../shared/types.js';
 
@@ -27,17 +16,17 @@ import type {
  * status = 'Ок' AND include_in_analytics = 1 (внутренние переводы исключены).
  * Деньги — копейки INT; расходы возвращаются положительным числом. Категория —
  * ВСЕГДА через operations_effective (живой JOIN, db.ts), не «запечённая» колонка.
+ *
+ * Матрица категория×неделя календарного месяца (`monthOverview`) — domain/monthOverview.ts;
+ * она переиспользует periodTotals() отсюда, здесь же — только окно, выбранное WeekSwitcher'ом.
  */
 
-export const AGG_FILTER = "status = 'Ок' AND include_in_analytics = 1";
-
-interface TotalsRow {
-    income: number;
-    expense: number;
-    cnt: number;
-}
-
-function periodTotals(db: Db, from: string, to: string): PeriodTotalsDto {
+export function periodTotals(db: Db, from: string, to: string): PeriodTotalsDto {
+    interface TotalsRow {
+        income: number;
+        expense: number;
+        cnt: number;
+    }
     const row = db
         .prepare<[string, string], TotalsRow>(
             `SELECT
@@ -109,103 +98,6 @@ function expenseByKind(db: Db, from: string, to: string): ExpenseByKindDto {
         else result.unclassifiedKopecks = row.total;
     }
     return result;
-}
-
-interface UserCategoryRow {
-    id: number;
-    name: string;
-    category_abstract: string | null;
-    limit_kopecks: number | null;
-}
-
-function userCategoryRows(db: Db): UserCategoryRow[] {
-    return db
-        .prepare<[], UserCategoryRow>(
-            `SELECT uc.id AS id, uc.name AS name, ca.name AS category_abstract,
-                    uc.month_limit_kopecks AS limit_kopecks
-             FROM user_categories uc
-             LEFT JOIN category_abstract ca ON ca.id = uc.category_abstract_id
-             WHERE uc.name != 'Без категории'
-             ORDER BY ca.name IS NULL, ca.name, uc.name`,
-        )
-        .all();
-}
-
-interface WeekSpendRow {
-    id: number;
-    spent: number;
-}
-
-/** Траты по каждой категории за диапазон дат (одна неделя месяца), сгруппированные по id. */
-function spendByCategoryForRange(db: Db, from: string, to: string): Map<number, number> {
-    const rows = db
-        .prepare<[string, string], WeekSpendRow>(
-            `SELECT oe.effective_user_category_id AS id,
-                    COALESCE(-SUM(CASE WHEN oe.amount_kopecks < 0 THEN oe.amount_kopecks ELSE 0 END), 0) AS spent
-             FROM operations_effective oe
-             WHERE ${AGG_FILTER} AND oe.local_date >= ? AND oe.local_date <= ?
-             GROUP BY oe.effective_user_category_id`,
-        )
-        .all(from, to);
-    return new Map(rows.map((row) => [row.id, row.spent]));
-}
-
-/**
- * Матрица категория×неделя за календарный месяц, содержащий period.from, по каждой
- * user_categories (кроме служебной «Без категории»): план на месяц (month_limit_kopecks,
- * необязательное поле) + траты по каждой неделе месяца (periods.ts → weeksOfMonth, недели
- * Пн–Вс, обрезанные границами месяца). Не зависит от того, какая неделя выбрана
- * WeekSwitcher'ом — как и раньше резервы/цели/займы были не привязаны к окну дашборда.
- */
-function monthCategorySpend(db: Db, weeks: MonthWeek[]): MonthOverviewCategoryDto[] {
-    const categories = userCategoryRows(db);
-    const weekSpend = weeks.map((week) => spendByCategoryForRange(db, week.from, week.to));
-    return categories.map((row) => {
-        const weeklySpentKopecks = weekSpend.map((byCategory) => byCategory.get(row.id) ?? 0);
-        return {
-            name: row.name,
-            categoryAbstract: row.category_abstract,
-            limitKopecks: row.limit_kopecks,
-            weeklySpentKopecks,
-            spentKopecks: weeklySpentKopecks.reduce((sum, spent) => sum + spent, 0),
-        };
-    });
-}
-
-/**
- * Обзор календарного месяца, содержащего period.from (ARCHITECTURE.md §8.8) — не зависит
- * от того, какая неделя выбрана на дашборде: дни до зарплаты (из настроек) + матрица
- * категория×неделя трат месяца по категориям пользователя + план дохода/расход/баланс месяца.
- * План дохода = salaryAmountKopecks (доход за один день зарплаты) × число дней зарплаты в
- * месяце — не факт из операций типа income (зарплата может быть ещё не начислена на момент
- * просмотра), а ожидание по расписанию из настроек; null, если salaryAmountKopecks или
- * salaryDays не заданы. Расходы — periodTotals() за весь месяц (все операции, не только
- * категории пользователя, тот же AGG_FILTER, что и everywhere).
- */
-function buildMonthOverview(db: Db, from: string): MonthOverviewDto {
-    const { from: monthFrom, to: monthTo } = monthBounds(from);
-    const key = monthKey(monthFrom);
-    const weeks = weeksOfMonth(monthFrom, monthTo);
-    const salaryDays = getSalaryDays(db);
-    const salaryAmountKopecks = getSalaryAmountKopecks(db);
-    const today = moscowTodayIso();
-    const nextSalary = nextSalaryDate(today, salaryDays);
-    const expenseKopecks = periodTotals(db, monthFrom, monthTo).expenseKopecks;
-    const plannedIncomeKopecks =
-        salaryAmountKopecks !== null && salaryDays.length > 0 ? salaryAmountKopecks * salaryDays.length : null;
-
-    return {
-        month: { from: monthFrom, to: monthTo, key },
-        weeks,
-        categories: monthCategorySpend(db, weeks),
-        salaryDays,
-        nextSalaryDate: nextSalary,
-        daysUntilSalary: nextSalary !== null ? daysBetween(today, nextSalary) : null,
-        plannedIncomeKopecks,
-        expenseKopecks,
-        balanceKopecks: plannedIncomeKopecks === null ? null : plannedIncomeKopecks - expenseKopecks,
-        owedToUserKopecks: getOwedToUserKopecks(db),
-    };
 }
 
 function deltaPct(current: number, prev: number): number | null {

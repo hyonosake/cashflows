@@ -1,6 +1,7 @@
 import type { Db } from '../db.js';
-import { badRequest, notFound } from '../http.js';
-import { AGG_FILTER } from './dashboard.js';
+import { notFound } from '../http.js';
+import { resolveUserCategoryId } from './categories.js';
+import { AGG_FILTER } from './queryFilters.js';
 import type { MerchantSummaryDto } from '../../../shared/types.js';
 
 /**
@@ -58,11 +59,8 @@ export function listMerchants(db: Db): MerchantSummaryDto[] {
 
 /** Меняет category у ВСЕГО мерчанта целиком — прямой FK, без правил и пересчёта (живой JOIN). */
 export function setMerchantCategory(db: Db, merchant: string, targetCategory: string): void {
-    const userCategory = db.prepare<[string], { id: number }>('SELECT id FROM user_categories WHERE name = ?').get(targetCategory);
-    if (userCategory === undefined) {
-        throw badRequest(`Неизвестная категория "${targetCategory}"`);
-    }
-    const result = db.prepare('UPDATE merchants SET user_category_id = ? WHERE name = ?').run(userCategory.id, merchant);
+    const userCategoryId = resolveUserCategoryId(db, targetCategory);
+    const result = db.prepare('UPDATE merchants SET user_category_id = ? WHERE name = ?').run(userCategoryId, merchant);
     if (result.changes === 0) {
         throw notFound(`Мерчант "${merchant}" не найден`);
     }
