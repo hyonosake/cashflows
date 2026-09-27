@@ -2,11 +2,11 @@ import { useMemo, useState } from 'react';
 import { apiErrorText, setMerchantCategory } from '../api';
 import { useCategoryFields } from '../hooks/useCategoryFields';
 import { useMerchants } from '../hooks/useMerchants';
+import { CategorySelect } from '../components/CategorySelect';
 import { CollapsibleSection } from '../components/ui/CollapsibleSection';
 import { ErrorBanner } from '../components/ui/ErrorBanner';
-import { SearchableSelect } from '../components/ui/SearchableSelect';
 import { Spinner } from '../components/ui/Spinner';
-import { categoryOptionLabel, formatMoney } from '../format';
+import { formatMoney } from '../format';
 
 /**
  * Секция «Настройки» — все мерчанты (operations.description) с суммой трат за всё время
@@ -89,14 +89,13 @@ export function MerchantsSection({ version, onDataChanged }: Props): JSX.Element
                     для разовой правки одной операции используйте страницу «Операции».
                 </p>
                 <div style={{ display: 'flex', gap: 8 }}>
-                    <SearchableSelect
+                    <CategorySelect
                         value={categoryFilter}
                         onChange={setCategoryFilter}
                         aria-label="Фильтр по текущей категории"
-                        options={[
-                            { value: '', label: 'Все категории' },
-                            ...presentCategories.map((c) => ({ value: c, label: categoryOptionLabel(c, sphereByCategory.get(c)) })),
-                        ]}
+                        categories={presentCategories}
+                        categorySpheres={sphereByCategory}
+                        placeholder="Все категории"
                     />
                     <input
                         type="search"
@@ -139,17 +138,14 @@ export function MerchantsSection({ version, onDataChanged }: Props): JSX.Element
                                 <tr key={m.merchant}>
                                     <td>{m.merchant}</td>
                                     <td>
-                                        <SearchableSelect
+                                        <CategorySelect
                                             value={m.category}
                                             disabled={busyMerchant === m.merchant}
                                             aria-label={`Категория мерчанта ${m.merchant}`}
                                             onChange={(next) => void handleChangeCategory(m.merchant, next)}
-                                            options={[
-                                                ...(!categories.includes(m.category)
-                                                    ? [{ value: m.category, label: `${m.category} (банк)`, disabled: true }]
-                                                    : []),
-                                                ...categories.map((c) => ({ value: c, label: categoryOptionLabel(c, sphereByCategory.get(c)) })),
-                                            ]}
+                                            categories={categories}
+                                            categorySpheres={sphereByCategory}
+                                            fallbackOption={(value) => ({ value, label: `${value} (банк)`, disabled: true })}
                                         />
                                         {m.mixedCategories && (
                                             <span className="muted" title="У этого мерчанта сейчас разные категории у разных операций — показана та, на которую пришлось больше всего трат">

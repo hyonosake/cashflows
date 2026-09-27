@@ -1,6 +1,6 @@
 import type { OperationType } from '../../../shared/types';
-import { categoryOptionLabel } from '../format';
 import { todayIso } from '../periods';
+import { CategorySelect } from './CategorySelect';
 import { SearchableSelect } from './ui/SearchableSelect';
 
 /**
@@ -53,14 +53,13 @@ export function OperationsFiltersBar({ filters, categories, categorySpheres, onC
             </div>
             <div className="field">
                 <label htmlFor="ops-category">Категория</label>
-                <SearchableSelect
+                <CategorySelect
                     id="ops-category"
                     value={filters.category}
                     onChange={(next) => onChange({ ...filters, category: next })}
-                    options={[
-                        { value: '', label: 'Все категории' },
-                        ...categories.map((c) => ({ value: c, label: categoryOptionLabel(c, categorySpheres.get(c)) })),
-                    ]}
+                    categories={categories}
+                    categorySpheres={categorySpheres}
+                    placeholder="Все категории"
                 />
             </div>
             <div className="field">

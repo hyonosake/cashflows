@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { OperationDto } from '../../../shared/types';
-import { categoryOptionLabel } from '../format';
+import { CategorySelect } from './CategorySelect';
 import { ErrorBanner } from './ui/ErrorBanner';
 import { SearchableSelect } from './ui/SearchableSelect';
 
@@ -174,16 +174,12 @@ export function CreateRuleDialog({
                         )}
                         <div className="field">
                             <label htmlFor="rule-target-category">Целевая категория</label>
-                            <SearchableSelect
+                            <CategorySelect
                                 id="rule-target-category"
                                 value={targetCategory}
                                 onChange={setTargetCategory}
-                                options={[
-                                    ...(targetCategory !== '' && !categories.includes(targetCategory)
-                                        ? [{ value: targetCategory, label: targetCategory }]
-                                        : []),
-                                    ...categories.map((c) => ({ value: c, label: categoryOptionLabel(c, categorySpheres.get(c)) })),
-                                ]}
+                                categories={categories}
+                                categorySpheres={categorySpheres}
                             />
                         </div>
                     </div>
