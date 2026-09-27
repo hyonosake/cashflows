@@ -101,6 +101,10 @@ export const categoryAreaInputSchema = z.object({
     name: z.string().trim().min(1, 'name обязателен и не может быть пустым'),
 });
 
+export const areaParamSchema = z.object({
+    area: z.string().trim().min(1, 'area обязателен'),
+});
+
 // --- merchants ---
 
 export const merchantCategoryInputSchema = z.object({

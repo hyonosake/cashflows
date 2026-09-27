@@ -13,6 +13,7 @@ import {
     listCategoryKinds,
     listCategoryLimits,
     listUserCategories,
+    renameUserCategory,
     setCategoryKind,
     setCategoryLimit,
 } from '../domain/categories.js';
@@ -24,6 +25,8 @@ import {
  * заводится НОВАЯ категория (CategoryKindsSection, «Новая категория»); везде, где категория
  * выбирается как цель (маппинги, мерчанты), это строгий select из уже существующих, без
  * возможности вписать новое имя тут же — заводить новую категорию нужно сначала здесь.
+ * PUT /api/categories/:category — переименование (нельзя переименовать «Без категории» и
+ * нельзя переименовать В «Без категории»); ссылки — по id (FK), каскад не нужен.
  * DELETE /api/categories/:category — удаление категории (нельзя удалить «Без категории»);
  * все ссылки на неё разрываются одной транзакцией (domain/categories.ts →
  * deleteUserCategory) — override операций и merchants.user_category_id обнуляются,
@@ -46,6 +49,12 @@ export async function categoryRoutes(fastify: FastifyInstance): Promise<void> {
         const { name } = parseOr400(userCategoryInputSchema, request.body);
         const dto = createUserCategory(fastify.db, name);
         return await reply.code(201).send(dto);
+    });
+
+    fastify.put('/api/categories/:category', async (request) => {
+        const { category } = parseOr400(categoryParamSchema, request.params);
+        const { name } = parseOr400(userCategoryInputSchema, request.body);
+        return await Promise.resolve(renameUserCategory(fastify.db, category, name));
     });
 
     fastify.delete('/api/categories/:category', async (request, reply) => {

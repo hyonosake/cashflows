@@ -1,5 +1,5 @@
 import type { Db } from '../db.js';
-import { badRequest } from '../http.js';
+import { badRequest, notFound } from '../http.js';
 import { resolveUserCategoryId } from './categories.js';
 import type { CategoryFieldDto } from '../../../shared/types.js';
 
@@ -50,4 +50,24 @@ export function createCategoryArea(db: Db, name: string): { name: string } {
     }
     db.prepare('INSERT INTO category_abstract (name, created_at) VALUES (?, ?)').run(name, new Date().toISOString());
     return { name };
+}
+
+/**
+ * Переименование сферы — категории ссылаются на неё по category_abstract_id (FK), поэтому,
+ * как и с user_categories, переименование не требует каскада: у всех категорий этой сферы
+ * оно просто отобразится под новым именем через живой JOIN (MonthOverview/CategoryKindsSection).
+ */
+export function renameCategoryArea(db: Db, name: string, newName: string): { name: string } {
+    const row = db.prepare<[string], { id: number }>('SELECT id FROM category_abstract WHERE name = ?').get(name);
+    if (row === undefined) {
+        throw notFound(`Сфера "${name}" не найдена`);
+    }
+    if (newName !== name) {
+        const existing = db.prepare<[string], { id: number }>('SELECT id FROM category_abstract WHERE name = ?').get(newName);
+        if (existing !== undefined) {
+            throw badRequest(`Сфера "${newName}" уже существует`);
+        }
+    }
+    db.prepare('UPDATE category_abstract SET name = ? WHERE id = ?').run(newName, row.id);
+    return { name: newName };
 }

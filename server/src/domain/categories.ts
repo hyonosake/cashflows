@@ -48,6 +48,36 @@ export function createUserCategory(db: Db, name: string): { name: string } {
 }
 
 /**
+ * Переименование категории — правки ссылаются на неё по id (FK), а не по имени, так что
+ * переименование не требует никакого каскада: mcc_mappings/custom_mappings/merchants/override
+ * операций продолжают указывать на ту же строку user_categories, просто с новым name.
+ * «Без категории» нельзя ни переименовать (это служебное имя, на него завязаны COALESCE-фолбэки
+ * в SQL — db.ts, routes/operations.ts), ни переименовать ДРУГУЮ категорию в неё (создало бы
+ * вторую строку с этим именем поверх уже существующей служебной, а code полагается на то, что
+ * оно ровно одно).
+ */
+export function renameUserCategory(db: Db, name: string, newName: string): { name: string } {
+    if (name === 'Без категории') {
+        throw badRequest('Нельзя переименовать служебную категорию «Без категории»');
+    }
+    if (newName === 'Без категории') {
+        throw badRequest('Нельзя переименовать категорию в служебное имя «Без категории»');
+    }
+    const row = db.prepare<[string], { id: number }>('SELECT id FROM user_categories WHERE name = ?').get(name);
+    if (row === undefined) {
+        throw notFound(`Категория "${name}" не найдена`);
+    }
+    if (newName !== name) {
+        const existing = db.prepare<[string], { id: number }>('SELECT id FROM user_categories WHERE name = ?').get(newName);
+        if (existing !== undefined) {
+            throw badRequest(`Категория "${newName}" уже существует`);
+        }
+    }
+    db.prepare('UPDATE user_categories SET name = ? WHERE id = ?').run(newName, row.id);
+    return { name: newName };
+}
+
+/**
  * Удаление категории — единственное место, где строка user_categories физически исчезает.
  * «Без категории» удалить нельзя: это служебный фолбэк operations_effective (db.ts, COALESCE
  * в самом конце цепочки) — без неё эффективная категория стала бы NULL для любой операции,
