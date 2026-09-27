@@ -31,29 +31,44 @@ server/src/        Fastify-бекенд
   csv/             parser.ts (csv-parse RFC 4180, 17 колонок по именам) + normalize.ts (даты,
                    копейки, hash; категорию больше НЕ вычисляет — только hash+сырые поля)
   domain/          import.ts (нормализация + дедуп с учётом кратности + find-or-create
-                   merchants + разовый override, одна транзакция), dashboard.ts (buildDashboard:
-                   totals/change/byCategory/expenseByKind/goals ЗА ВСЁ ВРЕМЯ + monthOverview —
-                   календарный месяц, содержащий period.from, с разбивкой на недели),
-                   categories.ts (listUserCategories + CRUD тегов/сфер/лимитов/mcc-mappings/
-                   custom-mappings — вся работа с user_categories/category_abstract), goals.ts
-                   (CRUD, без прогресса), merchants.ts (listMerchants/setMerchantCategory —
-                   ЗА ВСЁ ВРЕМЯ, правило description на весь мерчант через FK
-                   merchants.user_category_id), periods.ts (weekStart/isoWeekKey/monthBounds/
-                   weeksOfMonth/nextSalaryDate — учитывает несколько дней зарплаты в месяце),
-                   money.ts (parseAmountToKopecks)
-  routes/          health, import, dashboard (?from&to), operations (+ PUT /:id/category —
-                   разовый override без правила; ?categories= через запятую), goals, merchants,
-                   categories (+ mcc-mappings, custom-mappings, kinds, fields, limits — см. API),
-                   settings, debug (дамп всех таблиц БД по 10 строк — вкладка Debug на фронте),
-                   schemas.ts — zod
+                   merchants + разовый override, одна транзакция), operations.ts
+                   (listOperations/setOperationCategoryOverride — единственная сущность, где
+                   эта логика раньше жила прямо в routes/, вынесена для единообразия с
+                   остальными), dashboard.ts (buildDashboard: totals/change/byCategory/
+                   expenseByKind/goals ЗА ВСЁ ВРЕМЯ; экспортирует periodTotals, переиспользуемый
+                   monthOverview.ts), monthOverview.ts (buildMonthOverview — календарный месяц,
+                   содержащий period.from, с разбивкой на недели), queryFilters.ts (AGG_FILTER —
+                   общий фильтр аналитики, шарится dashboard.ts/monthOverview.ts/merchants.ts,
+                   чтобы merchants.ts не зависел от dashboard.ts), categories.ts
+                   (listUserCategories + CRUD + kind-тег + месячный лимит + resolveUserCategoryId
+                   — общий lookup id категории по имени, шарится merchants.ts/operations.ts),
+                   categoryAreas.ts (CRUD сфер category_abstract), categoryMappings.ts (CRUD
+                   mcc_mappings/custom_mappings), goals.ts (CRUD, без прогресса), merchants.ts
+                   (listMerchants/setMerchantCategory — ЗА ВСЁ ВРЕМЯ, правило description на весь
+                   мерчант через FK merchants.user_category_id), periods.ts (чистая дата-
+                   арифметика: weekStart/isoWeekKey/monthBounds/weeksOfMonth) + periodResolution.ts
+                   (семантика периода дашборда поверх неё: detectPeriodType/resolveDashboardRange/
+                   nextSalaryDate — учитывает несколько дней зарплаты в месяце), money.ts
+                   (parseAmountToKopecks); testDb.ts + *.test.ts — единственные backend-тесты
+                   в проекте (vitest, in-memory SQLite), проверяют приоритет резолвинга
+                   эффективной категории (инвариант 5) и CRUD mcc/custom-mappings, см. «Команды»
+  routes/          health, import, dashboard (?from&to), operations (тонкий, вызывает
+                   domain/operations.ts; + PUT /:id/category — разовый override без правила;
+                   ?categories= через запятую), goals, merchants, categories (core CRUD + kinds +
+                   limits), categoryMappings.ts (mcc-mappings, custom-mappings, mcc-options),
+                   categoryAreas.ts (fields, areas — см. API), settings, debug (дамп всех таблиц
+                   БД по 10 строк — вкладка Debug на фронте), schemas.ts — zod, секции по
+                   сущностям
   scripts/         CLI, запускаются `npx tsx server/src/scripts/<file>.ts` (или через npm run,
                    где есть): import-samples.ts (npm run import:samples), auto-map-merchants.ts
                    (npm run auto-map — эвристика по словарю известных сетей, ничего не пишет без
-                   --apply), inspect-xlsx.ts (npm run inspect:xlsx — разведка произвольного xlsx,
-                   исторический артефакт, сейчас ничем не используется), dump-rows.ts (без npm-
-                   скрипта — дамп диапазона строк листа xlsx). Скриптов импорта/экспорта бюджета
-                   и пересчёта категорий («recategorize») БОЛЬШЕ НЕТ — вместе с budgets/plans
-                   удалены; пересчитывать категории не нужно НИКОГДА (см. инвариант 5)
+                   --apply; переиспользует domain/merchants.ts::setMerchantCategory +
+                   domain/categories.ts::listUserCategories, не дублирует SQL), inspect-xlsx.ts
+                   (npm run inspect:xlsx — разведка произвольного xlsx, исторический артефакт,
+                   сейчас ничем не используется), dump-rows.ts (без npm-скрипта — дамп диапазона
+                   строк листа xlsx). Скриптов импорта/экспорта бюджета и пересчёта категорий
+                   («recategorize») БОЛЬШЕ НЕТ — вместе с budgets/plans удалены; пересчитывать
+                   категории не нужно НИКОГДА (см. инвариант 5)
 web/               React SPA (Vite, root web/), 4 таба (App.tsx): Дашборд/Операции/Настройки/
   Debug + переключатель светлой/тёмной темы (useTheme, localStorage)
   pages/           Dashboard (WeekSwitcher + KPI + MonthOverview + CategoryBreakdown/
@@ -61,18 +76,23 @@ web/               React SPA (Vite, root web/), 4 таба (App.tsx): Дашбо
                    пагинация + CreateRuleDialog), Settings (контейнер секций, см. sections/),
                    Debug (сырой дамп таблиц БД, GET /api/debug/tables)
   sections/        GeneralSettingsSection (дни зарплаты — единственная общая настройка),
-                   GoalsSection (CRUD, имя+сумма, без категорий/прогресса), MappingsSection
-                   (mcc_mappings + custom_mappings), MerchantsSection (все мерчанты по убыванию
-                   трат за всё время + текущая категория, строгий SearchableSelect только из
-                   категорий пользователя, «(банк)» — заблокированный вариант для ещё
-                   неразмеченных), CategoryKindsSection («Настройки категорий»: на категорию —
-                   тег fixed/variable/reserve, «сфера» (SearchableSelect из category_abstract,
-                   заводится отдельно полем «Новая сфера» — GET/POST /api/categories/areas, без
-                   привязки к конкретной категории) и «План на месяц» = month_limit_kopecks —
-                   независимые поля в одной секции; список категорий сгруппирован по сфере
-                   заголовками (алфавит сферы, категории без сферы — блоком «Без сферы» в конце),
-                   как строки MonthOverview; кнопка «Удалить» с ConfirmDialog — DELETE
-                   /api/categories/:category, кроме служебной «Без категории»)
+                   GoalsSection (CRUD, имя+сумма, без категорий/прогресса; удаление —
+                   useConfirmDelete), MappingsSection (контейнер: mcc_mappings +
+                   custom_mappings, рендерит по одному экземпляру mappings/MappingRuleForm +
+                   mappings/MappingRuleList на каждое правило — общая форма/список,
+                   различаются только первым полем формы, см. components/), MerchantsSection
+                   (все мерчанты по убыванию трат за всё время + текущая категория,
+                   CategorySelect с fallbackOption «(банк)» для ещё неразмеченных),
+                   CategoryKindsSection (контейнер «Настройки категорий»: считает группировку
+                   по сфере + рендерит category-kinds/InlineNameForm дважды («Новая категория»/
+                   «Новая сфера» — идентичная форма) и один category-kinds/CategoryRow на
+                   категорию — тег fixed/variable/reserve, «сфера» (SearchableSelect из
+                   category_abstract, заводится отдельно полем «Новая сфера» — GET/POST
+                   /api/categories/areas, без привязки к конкретной категории), «План на
+                   месяц» = month_limit_kopecks, «Удалить» с ConfirmDialog (useConfirmDelete)
+                   — DELETE /api/categories/:category, кроме служебной «Без категории»;
+                   список сгруппирован по сфере заголовками (алфавит сферы, категории без
+                   сферы — блоком «Без сферы» в конце), как строки MonthOverview)
   components/      MonthOverview (матрица категория×неделя: Категория | План | Неделя 1..N |
                    % от плана, группировка по category_abstract со строкой «Итого»; любая
                    недельная сумма, включая «0 ₽» и «Итого», кликабельна), WeekOperationsDialog
@@ -87,17 +107,26 @@ web/               React SPA (Vite, root web/), 4 таба (App.tsx): Дашбо
                    комбобокс с текстовым поиском по вариантам, замена ВСЕХ нативных <select> в
                    приложении; список рисуется position:fixed по координатам инпута, закрывается
                    при скролле СТРАНИЦЫ, но игнорирует скролл внутри себя же — иначе длинный
-                   список закрывался бы при попытке прокрутить его колесом мыши). Везде, где
-                   вариант — категория (MerchantsSection/MappingsSection/OperationsFiltersBar/
-                   CreateRuleDialog), подпись дополняется сферой через format.ts →
-                   categoryOptionLabel, например «Психолог (Сима)»: user_categories.name
+                   список закрывался бы при попытке прокрутить его колесом мыши), CategorySelect
+                   (обёртка над SearchableSelect для выбора категории — единственное место, где
+                   строится список вариантов «категория со сферой»: categoryOptionLabel(c,
+                   sphere) + опциональный placeholder-пункт + fallbackOption для значения вне
+                   списка категорий, например «(банк)» у ещё неразмеченного мерчанта; используется
+                   в MerchantsSection/MappingsSection/OperationsFiltersBar/CreateRuleDialog вместо
+                   ручного categories.map(...)). Подпись варианта дополняется сферой через
+                   format.ts → categoryOptionLabel, например «Психолог (Сима)»: user_categories.name
                    уникально, но похожие/составные названия (несколько «Психолог …» на разных
                    членов семьи) неразличимы на слух без сферы. Источник — useCategoryFields
                    (не useCategories) везде, где нужна и категория, и её сфера одним запросом.
   hooks/           useApiQuery (общий GET-хук, AbortController) + один хук на сущность
                    (useCategories/useCategoryKinds/useCategoryFields/useCategoryAreas/
                    useCategoryLimits/useCustomMappings/useMcMappings/useMerchants/useGoals/
-                   useSettings/useDashboard/useOperations/useDebugTables/useImport/useTheme)
+                   useSettings/useDashboard/useOperations/useDebugTables/useImport/useTheme) +
+                   два общих UI-хука поверх них: useConfirmDelete (pending id + busy +
+                   confirm/cancel — общий паттерн «запрос → подтверждение в ConfirmDialog →
+                   удаление», раньше копипастился в CategoryKindsSection/MappingsSection×2/
+                   GoalsSection) и useCreateRule (состояние + обработчики CreateRuleDialog,
+                   общее для Operations.tsx и WeekOperationsDialog)
   src/api.ts       типизированный fetch-клиент (ApiError); src/format.ts — форматирование денег/
                    дат/процентов (переиспользовать!); src/constants.ts — API_PREFIX/лимиты/пороги;
                    src/periods.ts — недельная арифметика на фронте; тесты — *.test.ts(x) рядом
@@ -129,7 +158,11 @@ docs/ARCHITECTURE.md  §1–4 (контекст/стек/структура) и 
 npm run dev              # бек :3000 (tsx watch) + vite :5173; в браузере открывать http://localhost:5173
 npm run build && npm start  # прод: единый процесс на :3000 (UI + API), entry server/dist/server/src/index.js
 npm run typecheck        # tsc --noEmit для server/tsconfig.json И web/tsconfig.json — запускать после ЛЮБЫХ правок
-npm run test             # vitest run — 262 теста в 17 файлах (web/*.test.ts(x)); test:watch — watch-режим
+npm run test             # vitest run — 296 тестов в 19 файлах: test.projects (vitest.config.ts) —
+                          # "web" (17 файлов, web/*.test.ts(x), jsdom) и "server" (2 файла,
+                          # server/src/domain/*.test.ts, node, in-memory SQLite — приоритет
+                          # резолвинга эффективной категории + CRUD mcc/custom-mappings,
+                          # единственные backend-тесты в проекте); test:watch — watch-режим
 npm run import:samples   # импорт samples/*.csv в БД (идемпотентно, тот же domain/import.ts, что HTTP-роут)
 npm run inspect:xlsx     # разведка произвольного xlsx (server/src/scripts/inspect-xlsx.ts [путь]) — исторический
                           # артефакт, применений в текущей фиче-модели сейчас нет
