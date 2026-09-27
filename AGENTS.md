@@ -12,9 +12,9 @@ Fastify 5 + better-sqlite3 (без ORM), React 18 + Vite + Recharts (донат 
 только строка появилась в `merchants`/`mcc_mappings`/`custom_mappings`. Бюджетов, планов дохода/
 расхода и резервов в схеме больше нет (убраны рефакторингом до этой сессии) — единственный
 плановый концепт сегодня: необязательный `user_categories.month_limit_kopecks` («план на месяц»),
-показанный в матрице «Обзор месяца». **`docs/ARCHITECTURE.md` описывает СТАРУЮ модель (§5, §7.2,
-§8.3–§8.7, §9, §12) и на данный момент недостоверен почти во всём, что касается схемы БД, API и
-скриптов — не доверяйте ему, ориентируйтесь на этот файл и на код.**
+показанный в матрице «Обзор месяца». Этот файл — единственный источник истины по архитектуре
+(отдельный `docs/ARCHITECTURE.md` описывал СТАРУЮ, снесённую рефакторингом модель и был удалён
+как вводящий в заблуждение — не пытайтесь его найти, ориентируйтесь на этот файл и на код).
 
 ## Карта проекта
 
@@ -146,15 +146,12 @@ shared/types.ts    ЕДИНСТВЕННЫЙ источник API-типов (DTO
                    пути. Дыра контракта: `OperationsQuery` не объявляет `categories` (список через
                    запятую), хотя роут и `web/src/api.ts` его реально поддерживают — ориентируйтесь
                    на код routes/operations.ts и api.ts, не только на этот интерфейс
-samples/           sample-operations.csv + CSV_FORMAT.md (контракт формата) + budget_export/
-                   (categories.json/mappings.json/plans.json/README-export.md — артефакт УДАЛЁННОЙ
-                   фичи импорта бюджета из xlsx, сейчас ничем не используется, не пытаться найти
-                   npm run import:budget/export:budget — их нет)
+samples/           sample-operations.csv + CSV_FORMAT.md (контракт формата). budget_export/
+                   (JSON-артефакт удалённой фичи импорта бюджета из xlsx) удалён вместе с
+                   docs/ARCHITECTURE.md и PLANS.md (оба описывали снесённую рефакторингом
+                   архитектуру — budgets/plans/reserves/goals-с-категориями/category_mappings) —
+                   не пытаться найти ни их, ни `npm run import:budget`/`export:budget` — их нет
 data/              cashflows.sqlite (+ -wal/-shm); в .gitignore
-docs/ARCHITECTURE.md  §1–4 (контекст/стек/структура) и §6.1–6.5 (парсинг/дедуп CSV) в целом ещё
-                   соответствуют коду; §5 (схема), §6.6 (эффективная категория), §7.2 (эндпоинты),
-                   §8.3–§8.7 (план/факт, бюджеты, займы, цели/резервы), §9 (скрипты/миграции),
-                   §12 (импорт бюджета) — устарели, описывают снесённую архитектуру
 ```
 
 Поток импорта CSV (единая реализация для HTTP-роута и CLI): `csv/parser.ts` (RFC 4180, колонки по
@@ -170,11 +167,12 @@ docs/ARCHITECTURE.md  §1–4 (контекст/стек/структура) и 
 npm run dev              # бек :3000 (tsx watch) + vite :5173; в браузере открывать http://localhost:5173
 npm run build && npm start  # прод: единый процесс на :3000 (UI + API), entry server/dist/server/src/index.js
 npm run typecheck        # tsc --noEmit для server/tsconfig.json И web/tsconfig.json — запускать после ЛЮБЫХ правок
-npm run test             # vitest run — 301 тест в 20 файлах: test.projects (vitest.config.ts) —
-                          # "web" (17 файлов, web/*.test.ts(x), jsdom) и "server" (3 файла,
+npm run test             # vitest run — 320 тестов в 22 файлах: test.projects (vitest.config.ts) —
+                          # "web" (17 файлов, web/*.test.ts(x), jsdom) и "server" (5 файлов,
                           # server/src/domain/*.test.ts, node, in-memory SQLite — приоритет
                           # резолвинга эффективной категории на синтетических операциях и на
-                          # реальном samples/sample-operations.csv + CRUD mcc/custom-mappings,
+                          # реальном samples/sample-operations.csv + CRUD mcc/custom-mappings +
+                          # переименование категорий/сфер,
                           # единственные backend-тесты в проекте); test:watch — watch-режим
 npm run import:samples   # импорт samples/*.csv в БД (идемпотентно, тот же domain/import.ts, что HTTP-роут)
 npm run inspect:xlsx     # разведка произвольного xlsx (server/src/scripts/inspect-xlsx.ts [путь]) — исторический
@@ -358,10 +356,9 @@ EXISTS` + `CREATE VIEW` при каждом старте достаточно. �
   (`vi.stubGlobal('fetch')`, `vi.mock`), сервер :3000 не запускается. Конфиг — `vitest.config.ts`
   (отдельно от `vite.config.ts`, прод-сборка не затронута).
 - Интерфейс и сообщения об ошибках — на русском.
-- Комментарии в коде местами ссылаются на разделы `docs/ARCHITECTURE.md` — не доверяйте этим
-  ссылкам вслепую (см. предупреждение в начале файла): часть цитируемых разделов больше не
-  соответствует содержимому. Новые комментарии лучше писать без опоры на номера параграфов,
-  пока документ не приведён в соответствие.
+- Не ссылаться в комментариях на номера параграфов внешних документов (было неудобное место:
+  комментарии массово цитировали `docs/ARCHITECTURE.md §N`, документ устарел и был удалён, ссылки
+  пришлось вычищать по всему кодбейзу) — писать самодостаточные комментарии о текущем коде.
 
 ## Известные ограничения / грабли
 
@@ -387,9 +384,9 @@ EXISTS` + `CREATE VIEW` при каждом старте достаточно. �
   запятую), хотя `routes/operations.ts` и `web/src/api.ts` (`OperationsFilters.categories`) его
   полноценно поддерживают — это разъехавшийся, но рабочий контракт; при правке фильтров
   ориентироваться на реальный код роута/клиента, а не только на этот интерфейс.
-- `samples/budget_export/*.json` — артефакт удалённой фичи импорта бюджета из xlsx; скриптов
-  `import:budget`/`export:budget`/`seed:category-kinds` не существует, эти файлы сейчас ничем не
-  потребляются.
+- Скриптов `import:budget`/`export:budget`/`seed:category-kinds` не существует — вместе с ними
+  удалены и артефакты `samples/budget_export/*.json` (были частью снесённой фичи импорта бюджета
+  из xlsx).
 - `npm run auto-map` — эвристика по словарю известных сетей (см. `HINTS` в
   `auto-map-merchants.ts`), не LLM: создаёт правило (`merchants.user_category_id`) только когда
   целевая категория однозначно резолвится среди уже существующих категорий пользователя. По

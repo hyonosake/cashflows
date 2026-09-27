@@ -4,7 +4,7 @@ import { parseOr400 } from '../http.js';
 import { goalInputSchema, idParamSchema } from './schemas.js';
 
 /**
- * CRUD /api/goals (ARCHITECTURE.md §7.2): GET список, POST создание (201),
+ * CRUD /api/goals: GET список, POST создание (201),
  * PUT /:id обновление, DELETE /:id (204). Невалидное тело / неизвестный id → 400/404.
  */
 export async function goalRoutes(fastify: FastifyInstance): Promise<void> {

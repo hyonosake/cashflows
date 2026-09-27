@@ -1,12 +1,16 @@
 # Cashflows — дашборд личных финансов
 
 Cashflows принимает CSV-выгрузки операций из ЛК Т-Банка, складывает их в локальную SQLite-базу
-и показывает дашборд личных финансов: неделя/неделя, план/факт, разбивка по категориям и дням,
-бюджеты с контролем перерасхода. Один процесс, один файл данных, ноль внешних сервисов.
+и показывает дашборд личных финансов: неделя/неделя, обзор календарного месяца по категориям
+(план/факт/остаток), мерчанты, финансовые цели. Один процесс, один файл данных, ноль внешних
+сервисов, без аутентификации (локальный однопользовательский инструмент).
+
+Полная архитектура, схема БД, API-контракт и инварианты — в [`AGENTS.md`](AGENTS.md) (единственный
+источник истины по проекту, поддерживается в актуальном состоянии). Этот файл — только быстрый старт.
 
 ## Требования
 
-- **Node.js 22 LTS** (проверялось на 22.x; `engines` в `package.json`: `>=22`).
+- **Node.js 22 LTS**.
 - npm (идёт в комплекте с Node).
 
 ## Быстрый старт
@@ -31,24 +35,27 @@ npm run build && npm start
 ```
 
 `tsc` собирает сервер, `vite build` — SPA; затем единый Fastify-процесс на **http://localhost:3000**
-раздает и UI, и API. Открывать: **http://localhost:3000**.
+раздаёт и UI, и API. Открывать: **http://localhost:3000**.
 
 Проверка живости: `GET http://localhost:3000/api/health` → `{"ok":true,"version":"0.1.0"}`.
 
 ## Тесты
 
 ```bash
-npm run test        # разовый прогон (vitest run): 224 теста в 10 файлах
+npm run test        # разовый прогон (vitest run): 320 тестов в 22 файлах
 npm run test:watch  # watch-режим
 ```
 
-Стек: **vitest + Testing Library** (jsdom, конфиг — [vitest.config.ts](vitest.config.ts)). Покрываются:
-форматирование денег/дат ([web/src/format.ts](web/src/format.ts)), расчёт периодов/недель
-([web/src/periods.ts](web/src/periods.ts)), разбор API-ошибок ([web/src/api.ts](web/src/api.ts)),
-хуки данных (`useApiQuery`, `useImport`) и UI-компоненты (KPI-карточки, переключатель недель, диалог
-подтверждения, прогресс-бары, статистика импорта). Тесты работают **без сети**: `fetch` и модуль
-`api.ts` мокаются (`vi.stubGlobal` / `vi.mock`), сервер :3000 не запускается; глобали vitest не
-включены — явные импорты из `'vitest'`.
+Стек: **vitest + Testing Library**, два `test.projects` (конфиг — [vitest.config.ts](vitest.config.ts)):
+- **web** (jsdom) — форматирование денег/дат ([web/src/format.ts](web/src/format.ts)), расчёт
+  периодов/недель ([web/src/periods.ts](web/src/periods.ts)), разбор API-ошибок
+  ([web/src/api.ts](web/src/api.ts)), хуки данных, UI-компоненты и секции «Настроек»;
+- **server** (node, in-memory SQLite) — приоритет резолвинга эффективной категории
+  (override → правило по сообщению → мерчант → MCC → «Без категории») и CRUD категорий/сфер/
+  маппингов, включая прогон через реальный `samples/sample-operations.csv`.
+
+Тесты работают **без сети**: `fetch`/`api.ts` мокаются в web-тестах, backend-тесты гоняют
+in-memory SQLite — сервер :3000 нигде не запускается.
 
 ## Как импортировать выгрузку
 
@@ -62,116 +69,70 @@ npm run test:watch  # watch-режим
    npm run import:samples
    ```
 
-   Импортирует все CSV из `samples/` и печатает результат по каждому файлу.
+   Импортирует `samples/*.csv` и печатает результат — тот же `domain/import.ts`, что и HTTP-роут.
 
 **Дедупликация.** Повторный импорт того же файла безопасен: каждая строка хешируется (sha256 всех
-полей), дубликаты пропускаются. В ответе всегда видно три числа — `parsed` (разобрано строк),
-`inserted` (вставлено новых), `duplicatesSkipped` (пропущено дубликатов). Повторная загрузка
-того же файла даёт `inserted: 0, duplicatesSkipped: 117` — данные не задваиваются. Две одинаковые
-строки *внутри одного файла* (например, две поездки метро за минуту) вставляются обе.
+17 полей), дубликаты пропускаются с учётом кратности. В ответе всегда видно три числа —
+`parsed` (разобрано строк), `inserted` (вставлено новых), `duplicatesSkipped` (пропущено дубликатов).
+Повторная загрузка `samples/sample-operations.csv` даёт `inserted: 0, duplicatesSkipped: 117`. Две
+одинаковые строки *внутри одного файла* (например, две поездки метро за минуту) вставляются обе.
 
-## Бюджет из Excel
+## Категоризация
 
-Бюджетная таблица `budget_example.xlsx` переносится в приложение в два шага (JSON-файлы уже лежат
-в [samples/budget_export/](samples/budget_export/), см. [README-export.md](samples/budget_export/README-export.md)):
-
-1. `npm run export:budget` — выгрузка xlsx в машиночитаемые JSON (`mappings.json`, `plans.json`,
-   `categories.json`); в БД ничего не пишет. Для разовой инспекции книги есть `npm run inspect:xlsx`.
-2. `npm run import:budget` — идемпотентная загрузка в БД: 50 правил категоризации, 24 категориальных
-   бюджета на 2026-09 и 2 плана (доход/расход месяца); повторный запуск даёт 0 вставок/0 изменений.
-   Бюджеты привязаны к маппинговым категориям (словарь `budgetToMappingCategory`), чтобы факт
-   операций считался в spent.
-
-Резервы, цели накоплений и займы из xlsx пока **не грузятся** — ждут расширения контракта
-(см. `plans.json → conflicts`).
-
-## Дашборд
-
-Главный экран (вкладка «Дашборд») состоит из блоков:
-
-- **Переключатель недель** (← →) — переход между неделями Пн–Вс по Москве, кнопка «текущая неделя»;
-- **KPI-карточки**: Доходы, Расходы, Баланс периода — с дельтой к прошлой неделе (▲/▼ и %);
-- **График по дням** — столбцы доход/расход за каждый день периода (Пн–Вс);
-- **Донат по категориям** — доли расходов по категориям с легендой и суммами;
-- **План/факт** — плановая сумма на период против факта, процент выполнения;
-  если план не задан — «план не задан»;
-- **Бюджеты** — прогресс-бары с остатком лимита; при перерасходе прогресс подсвечивается;
-- **Операции** — таблица операций периода (полная таблица с фильтрами — на вкладке «Операции»);
-- **Настройки** — импорт CSV, создание/редактирование бюджетов и планов.
+Категория — не колонка, а живой SQL VIEW (`operations_effective`, приоритет: разовый override →
+подстрока в «Сообщении» → мерчант целиком → MCC-код → «Без категории»). Новое правило действует
+сразу для всех операций, прошлых и будущих — пересчитывать вручную никогда не нужно. Правила
+редактируются на вкладке «Настройки»: мерчанты, специальные правила категоризации (по сообщению/
+MCC), теги постоянная/переменная/резерв, «сферы» (группировка категорий в обзоре месяца), план
+на месяц. `npm run auto-map` — эвристика для авторазметки известных сетей/сервисов по словарю
+(предпросмотр по умолчанию, `--apply` пишет).
 
 ## API (кратко)
 
 База: `/api/*`, ответы JSON, деньги — целые **копейки** (поля `*Kopecks`), даты — `YYYY-MM-DD`
-по Москве. Полные типы — [shared/types.ts](shared/types.ts).
-
-| Метод и путь | Назначение | Ключевые параметры |
-|---|---|---|
-| `GET /api/health` | живость сервиса | — |
-| `POST /api/import` | импорт CSV (multipart, поле `file`) | файл выгрузки |
-| `GET /api/dashboard` | агрегаты дашборда | `from`, `to` (`YYYY-MM-DD`, оба или ни одного; по умолчанию текущая неделя) |
-| `GET /api/operations` | список операций с фильтрами | `from`, `to`, `category`, `type`, `q`, `analyticsOnly`, `page`, `limit` |
-| `GET /api/budgets` | список бюджетов | — |
-| `POST /api/budgets` | создать бюджет | тело: `name`, `categories[]`, `periodType`, `limitKopecks` |
-| `PUT /api/budgets/:id` | изменить бюджет | тело как у POST |
-| `DELETE /api/budgets/:id` | удалить бюджет | — |
-| `GET /api/plans` | список планов | `period_type`, `period_key`, `kind` |
-| `POST /api/plans` | создать план | тело: `kind`, `periodType`, `periodKey`, `amountKopecks` |
-| `PUT /api/plans/:id` | изменить план | тело как у POST |
-| `DELETE /api/plans/:id` | удалить план | — |
-| `GET /api/categories` | список категорий (для фильтров) | — |
-| `GET/POST/DELETE /api/categories/mappings` | правила переименования категорий | `matchType`, `matchValue`, `targetCategory` |
-
-Пример:
+по Москве. Полный контракт со всеми эндпоинтами, телами и инвариантами — в [AGENTS.md](AGENTS.md);
+типы — [shared/types.ts](shared/types.ts).
 
 ```bash
 curl "http://localhost:3000/api/dashboard?from=2026-09-01&to=2026-09-08"
+curl -F "file=@samples/sample-operations.csv" http://localhost:3000/api/import
 ```
 
 ## Структура проекта
 
 ```
 cashflows/
-├── package.json              # скрипты и все зависимости (без workspaces)
-├── tsconfig.base.json        # общие strict-опции TS
-├── vite.config.ts            # Vite: root web/, прокси /api → :3000, чанки
-├── docs/
-│   └── ARCHITECTURE.md       # архитектура: решения, схема данных, API-контракт
+├── package.json          # скрипты и все зависимости (без workspaces)
+├── tsconfig.base.json    # общие strict-опции TS
+├── vitest.config.ts      # test.projects: web (jsdom) + server (node)
+├── AGENTS.md             # архитектура, схема БД, API-контракт, инварианты — источник истины
 ├── samples/
 │   ├── CSV_FORMAT.md         # описание формата выгрузки Т-Банка
 │   └── sample-operations.csv # образец выгрузки (117 операций)
 ├── shared/
-│   └── types.ts              # единый источник типов API (DTO) для сервера и веба
+│   └── types.ts          # единый источник типов API (DTO) для сервера и веба
 ├── server/
-│   ├── tsconfig.json
 │   └── src/
-│       ├── index.ts          # bootstrap: конфиг → БД → Fastify → listen :3000
-│       ├── app.ts            # фабрика Fastify: плагины и роуты
-│       ├── config.ts         # PORT, DATA_DIR, DB_FILE, WEB_DIST
-│       ├── db.ts             # открытие SQLite, WAL, схема (4 таблицы)
-│       ├── csv/              # parser + normalize (даты, копейки, hash)
-│       ├── domain/           # импорт, дашборд, бюджеты, планы, периоды, деньги
-│       ├── routes/           # health, import, dashboard, operations, budgets, plans, categories
-│       └── scripts/          # CLI-импорт (npm run import:samples)
+│       ├── index.ts, app.ts, config.ts, db.ts
+│       ├── csv/           # parser + normalize
+│       ├── domain/        # бизнес-логика: import, operations, dashboard/monthOverview,
+│       │                  # categories/categoryAreas/categoryMappings, merchants, goals,
+│       │                  # periods/periodResolution, money, settings
+│       ├── routes/        # тонкие HTTP-хендлеры поверх domain/
+│       └── scripts/       # CLI (import-samples, auto-map-merchants)
 ├── web/
-│   └── src/                  # React SPA: pages/ (Dashboard, Operations, Settings), components/
+│   └── src/               # React SPA: pages/ (Dashboard, Operations, Settings, Debug),
+│                          # sections/ (секции «Настроек»), components/, hooks/
 └── data/
-    └── cashflows.sqlite      # база данных (создаётся автоматически)
+    └── cashflows.sqlite   # база данных (создаётся автоматически; в .gitignore)
 ```
 
 ## Где данные и как сбросить
 
 Все данные живут в одном файле: **`data/cashflows.sqlite`** (SQLite, WAL-режим; рядом появляются
-`-wal`/`-shm` — это нормально). Сброс к чистому состоянию:
+`-wal`/`-shm` — это нормально).
 
-```bash
-# остановить приложение, затем:
-rm data/cashflows.sqlite*
-```
-
-При следующем запуске база создастся заново пустой; после импорта образца в ней будет
-117 операций (99 из них участвуют в аналитике).
-
-## Подробнее
-
-- Архитектура, схема БД, алгоритм дедупликации, контракт API: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- Формат CSV-выгрузки Т-Банка: [samples/CSV_FORMAT.md](samples/CSV_FORMAT.md)
+**Не удалять `data/cashflows.sqlite*` для «сброса», если там реальные данные** — это стирает
+операции/мерчантов/правила/категории/цели безвозвратно, а не только тестовые. Для проверки фичи
+создавайте/удаляйте записи через API (curl) или UI, не пересоздавайте базу целиком. Пустая тестовая
+БД создаётся сама при первом запуске, если файла ещё не было.

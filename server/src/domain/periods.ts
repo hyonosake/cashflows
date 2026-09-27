@@ -1,5 +1,5 @@
 /**
- * Чистая дата-арифметика (ARCHITECTURE.md §8.1): недели Пн–Вс по Europe/Moscow,
+ * Чистая дата-арифметика: недели Пн–Вс по Europe/Moscow,
  * ISO-ключи '2026-W37' / '2026-09', «сегодня по Москве».
  *
  * Europe/Moscow с 2014 года — фиксированный UTC+3 (DST нет), поэтому таймзонные
@@ -41,7 +41,7 @@ export function weekStart(isoDate: string): string {
 
 /**
  * ISO-ключ недели 'YYYY-Www' по ISO 8601: первая неделя года — та,
- * что содержит первый четверг (ARCHITECTURE.md §8.1).
+ * что содержит первый четверг.
  */
 export function isoWeekKey(isoDate: string): string {
     const date = new Date(`${isoDate}T00:00:00Z`);

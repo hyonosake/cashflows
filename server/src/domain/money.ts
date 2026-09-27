@@ -1,5 +1,5 @@
 /**
- * Деньги: строка CSV → целые копейки, БЕЗ float-арифметики (ARCHITECTURE.md §6.3).
+ * Деньги: строка CSV → целые копейки, БЕЗ float-арифметики.
  * Регулярка: знак, целая часть, запятая-десятичный разделитель.
  * Дробная часть дополняется/обрезается до 2 знаков как строка.
  * Примеры: "-83,00" → -8300; "229743,72" → 22974372; "1,5" → 150.
@@ -30,7 +30,7 @@ export function parseAmountToKopecks(raw: string): number {
     return sign * kopecks;
 }
 
-/** Бонусы: как сумма, но ≥ 0 (ARCHITECTURE.md §5.1). */
+/** Бонусы: как сумма, но ≥ 0. */
 export function parseBonusToKopecks(raw: string): number {
     const value = parseAmountToKopecks(raw);
     return Math.max(0, value);

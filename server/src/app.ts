@@ -18,7 +18,7 @@ import { settingsRoutes } from './routes/settings.js';
 import { debugRoutes } from './routes/debug.js';
 
 /**
- * Фабрика приложения (ARCHITECTURE.md §4): декорации db/config, плагины,
+ * Фабрика приложения: декорации db/config, плагины,
  * регистрация роутов, единые обработчики ошибок (400/404/500 с JSON {error, details}).
  */
 export async function buildFastify(db: Db, config: Config): Promise<FastifyInstance> {

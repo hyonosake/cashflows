@@ -12,7 +12,7 @@ import type {
 } from '../../../shared/types.js';
 
 /**
- * Агрегаты дашборда (ARCHITECTURE.md §8). ВЕЗДЕ действует фильтр
+ * Агрегаты дашборда. ВЕЗДЕ действует фильтр
  * status = 'Ок' AND include_in_analytics = 1 (внутренние переводы исключены).
  * Деньги — копейки INT; расходы возвращаются положительным числом. Категория —
  * ВСЕГДА через operations_effective (живой JOIN, db.ts), не «запечённая» колонка.
@@ -107,7 +107,7 @@ function deltaPct(current: number, prev: number): number | null {
     return Math.round(((current - prev) / prev) * 10000) / 100;
 }
 
-/** Главная агрегатная функция: полный DashboardDto для окна from..to (ARCHITECTURE.md §8). */
+/** Главная агрегатная функция: полный DashboardDto для окна from..to. */
 export function buildDashboard(db: Db, from: string, to: string): DashboardDto {
     const type = detectPeriodType(from, to);
     const totals = periodTotals(db, from, to);

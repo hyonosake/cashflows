@@ -3,7 +3,7 @@ import type { DependencyList } from 'react';
 import { apiErrorText } from '../api';
 
 /**
- * Универсальный хук загрузки GET-данных (ARCHITECTURE.md §4):
+ * Универсальный хук загрузки GET-данных:
  * - AbortController в cleanup — запросы отменяются при unmount и при смене
  *   зависимостей (race conditions: устаревший ответ не перезапишет свежий,
  *   StrictMode double-mount не даёт двойных «живых» запросов);

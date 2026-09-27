@@ -5,7 +5,7 @@ import { resolveDashboardRange } from '../domain/periodResolution.js';
 import { isoDateSchema } from './schemas.js';
 
 /**
- * GET /api/dashboard — агрегаты дашборда (ARCHITECTURE.md §7.2, §8).
+ * GET /api/dashboard — агрегаты дашборда.
  * `?from&to` (оба или ни одного; без параметров — текущая московская неделя Пн..Вс, см.
  * domain/periods.ts → resolveDashboardRange).
  */

@@ -17,7 +17,7 @@ import {
 } from './api';
 
 /**
- * Тесты HTTP-клиента (ARCHITECTURE.md §7) на моке global.fetch (vi.stubGlobal):
+ * Тесты HTTP-клиента на моке global.fetch (vi.stubGlobal):
  * никакой сети, сервер :3000 не трогается. Проверяется разбор ответов:
  * 200 JSON, 204, 400 {error, details[]}, не-JSON тело, network failure, AbortError.
  */

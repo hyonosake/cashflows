@@ -4,7 +4,7 @@ import { normalizeRow, type NormalizedRow } from '../csv/normalize.js';
 import type { ImportErrorDto, ImportResultDto } from '../../../shared/types.js';
 
 /**
- * Оркестрация импорта CSV-файла (ARCHITECTURE.md §6.4): нормализация + дедупликация
+ * Оркестрация импорта CSV-файла: нормализация + дедупликация
  * по hash с учётом кратности + вставка в одной транзакции. Мерчант (description) —
  * find-or-create в merchants; «Ваша категория» из CSV — разовый override операции,
  * ТОЛЬКО если совпадает с существующей user_categories.name (строгий список категорий —
@@ -23,7 +23,7 @@ function existingHashCounts(db: Db, hashes: string[]): Map<string, number> {
     const counts = new Map<string, number>();
     for (let i = 0; i < unique.length; i += CHUNK_SIZE) {
         const chunk = unique.slice(i, i + CHUNK_SIZE);
-        // IN-запрос чанком по 500 (ARCHITECTURE.md §6.4)
+        // IN-запрос чанком по 500
         const placeholders = chunk.map(() => '?').join(',');
         const rows = db
             .prepare<string[], { hash: string; cnt: number }>(

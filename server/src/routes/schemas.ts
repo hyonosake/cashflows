@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * zod-схемы, зеркалирующие типы shared/types.ts (ARCHITECTURE.md §7).
+ * zod-схемы, зеркалирующие типы shared/types.ts.
  * Деньги — целые копейки (безопасные целые), периоды — ISO-форматы.
  */
 

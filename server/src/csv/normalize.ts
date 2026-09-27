@@ -4,7 +4,7 @@ import { parseAmountToKopecks, parseBonusToKopecks, MoneyParseError } from '../d
 import type { OperationType } from '../../../shared/types.js';
 
 /**
- * Нормализация сырой CSV-строки в доменный объект (ARCHITECTURE.md §6):
+ * Нормализация сырой CSV-строки в доменный объект:
  * даты → UTC ISO + local_date (Москва = UTC+3), суммы → копейки, include_in_analytics,
  * sha256-хеш всех 17 сырых полей. Категория больше НЕ вычисляется здесь — эффективная
  * категория теперь живой JOIN на чтении (см. db.ts → operations_effective); импорт только
@@ -43,7 +43,7 @@ const DATETIME_RE = /^(\d{2})\.(\d{2})\.(\d{4}) (\d{2}):(\d{2}):(\d{2})$/;
 
 /**
  * Сырое значение DD.MM.YYYY HH:mm:ss — московское локальное время (UTC+3 фиксированно,
- * DST нет — допущение ARCHITECTURE.md §11.1). local_date — чистая строковая операция,
+ * DST нет). local_date — чистая строковая операция,
  * datetime_iso — Date.UTC(...) − 3ч.
  */
 export function parseMoscowDateTime(raw: string): { datetimeIso: string; localDate: string } {
@@ -67,12 +67,12 @@ export function parseMoscowDateTime(raw: string): { datetimeIso: string; localDa
     return { datetimeIso, localDate };
 }
 
-/** sha256 от конкатенации всех 17 сырых значений разделителем \x1F (ARCHITECTURE.md §6.4). */
+/** sha256 от конкатенации всех 17 сырых значений разделителем \x1F. */
 export function rowHash(values: readonly string[]): string {
     return createHash('sha256').update(values.join('\x1F'), 'utf8').digest('hex');
 }
 
-/** «Учёт в аналитике»: только «Да» → 1, любые другие значения → 0 (ARCHITECTURE.md §6.5). */
+/** «Учёт в аналитике»: только «Да» → 1, любые другие значения → 0. */
 export function parseIncludeInAnalytics(raw: string): 0 | 1 {
     return raw.trim() === 'Да' ? 1 : 0;
 }

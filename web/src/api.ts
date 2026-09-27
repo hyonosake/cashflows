@@ -26,7 +26,7 @@ import type {
 import { API_PREFIX } from './constants';
 
 /**
- * Типизированный HTTP-клиент (ARCHITECTURE.md §7). Все вызовы идут на /api/*
+ * Типизированный HTTP-клиент. Все вызовы идут на /api/*
  * (в dev — через прокси Vite на :3000, в прод — тот же origin).
  * Единая точка вызовов API: компоненты не делают fetch напрямую.
  * Ошибки сервера приходят в формате { error, details? } — бросаем ApiError.

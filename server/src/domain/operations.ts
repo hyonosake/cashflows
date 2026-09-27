@@ -17,7 +17,7 @@ export interface ListOperationsQuery {
 }
 
 /**
- * GET /api/operations — список операций с фильтрами и пагинацией (ARCHITECTURE.md §7.2).
+ * GET /api/operations — список операций с фильтрами и пагинацией.
  * analyticsOnly=true (по умолчанию): только status='Ок' AND include_in_analytics=1.
  * Категория — ВСЕГДА через operations_effective (живой JOIN), не «запечённая» колонка.
  */

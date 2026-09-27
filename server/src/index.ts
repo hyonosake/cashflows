@@ -3,7 +3,7 @@ import { openDb } from './db.js';
 import { buildFastify } from './app.js';
 
 /**
- * Bootstrap (ARCHITECTURE.md §4): конфиг → БД → Fastify → listen :3000.
+ * Bootstrap: конфиг → БД → Fastify → listen :3000.
  */
 async function main(): Promise<void> {
     const config = loadConfig();

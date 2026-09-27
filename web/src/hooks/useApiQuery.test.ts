@@ -4,7 +4,7 @@ import { useApiQuery } from './useApiQuery';
 import { ApiError } from '../api';
 
 /**
- * Тесты универсального хука загрузки (ARCHITECTURE.md §4): data/error,
+ * Тесты универсального хука загрузки: data/error,
  * abort при смене deps (race из ревью!) и unmount, reload().
  * Сети нет: fetcher — замыкание с Deferred-ответами.
  */

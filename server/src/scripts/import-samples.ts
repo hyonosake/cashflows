@@ -6,7 +6,7 @@ import { importCsvBuffer } from '../domain/import.js';
 import { CsvFileError } from '../csv/parser.js';
 
 /**
- * CLI импорта образцов (ARCHITECTURE.md §9): `npm run import:samples [пути...]`.
+ * CLI импорта образцов: `npm run import:samples [пути...]`.
  * Аргументы — пути или glob-паттерны (по умолчанию `samples/*.csv`);
  * печатает ImportResultDto по каждому файлу. Использует тот же domain/import.ts,
  * что и HTTP-роут (единственная реализация логики).

@@ -54,7 +54,7 @@ function TablePanel({ table }: { table: DebugTableDto }): JSX.Element {
 }
 
 /**
- * Служебная debug-страница (ARCHITECTURE.md §5.8): сырой дамп всех таблиц БД
+ * Служебная debug-страница: сырой дамп всех таблиц БД
  * (по 10 строк) — сверять миграцию на нормализованные категории глазами, без sqlite3 CLI.
  */
 export function DebugPage({ version }: Props): JSX.Element {

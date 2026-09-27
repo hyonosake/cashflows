@@ -2,7 +2,7 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
 /**
- * Vite-конфиг веб-приложения (ARCHITECTURE.md §9).
+ * Vite-конфиг веб-приложения.
  * Корень — web/, прод-сборка — web/dist (раздаётся сервером через @fastify/static),
  * dev-прокси /api → http://localhost:3000 (CORS не нужен: dev — через прокси,
  * прод — единый origin).

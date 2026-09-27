@@ -14,7 +14,7 @@ import { formatMoney } from '../format';
 import { useDashboard } from '../hooks/useDashboard';
 
 /**
- * Главная страница (ARCHITECTURE.md §4): WeekSwitcher + KPI + графики + обзор месяца +
+ * Главная страница: WeekSwitcher + KPI + графики + обзор месяца +
  * цели + последний импорт. Данные — useDashboard(offset, version) с AbortController
  * (race при быстрой смене недель исключён).
  */

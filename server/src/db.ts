@@ -3,7 +3,7 @@ import path from 'node:path';
 import Database from 'better-sqlite3';
 
 /**
- * Открытие БД и идемпотентное создание схемы (ARCHITECTURE.md §5).
+ * Открытие БД и идемпотентное создание схемы.
  * Никаких ORM и миграционных фреймворков: CREATE TABLE IF NOT EXISTS — весь механизм.
  * Деньги — целые копейки (INTEGER). Время — двойное: datetime_iso (UTC) + local_date (Europe/Moscow).
  *
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS merchants (
 );
 
 -- Фолбэк по банковскому MCC-коду, когда у мерчанта самого по себе ещё нет категории.
--- Только однозначные коды (см. ARCHITECTURE.md §6.6) — неоднозначные (один код на
+-- Только однозначные коды — неоднозначные (один код на
 -- несколько разных user_categories, банк использует их как «мусорную» общую метку)
 -- сюда не попадают, такие операции остаются на уровне мерчанта.
 CREATE TABLE IF NOT EXISTS mcc_mappings (

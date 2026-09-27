@@ -1,7 +1,7 @@
 import path from 'node:path';
 
 /**
- * Конфигурация сервера: process.env с дефолтами (ARCHITECTURE.md §9).
+ * Конфигурация сервера: process.env с дефолтами.
  * dotenv не используется — все значения имеют локальные дефолты.
  */
 

@@ -4,7 +4,7 @@ import { importCsvBuffer } from '../domain/import.js';
 import { badRequest } from '../http.js';
 
 /**
- * POST /api/import — multipart с полем `file` (CSV) (ARCHITECTURE.md §7.2).
+ * POST /api/import — multipart с полем `file` (CSV).
  * Ошибка всего файла (битый/пустой CSV, нет заголовков) → 400 с внятным JSON.
  * Построчные ошибки → 200 с errors[] (импорт продолжается).
  */
