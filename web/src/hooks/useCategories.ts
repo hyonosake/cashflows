@@ -10,5 +10,5 @@ import { fetchCategories } from '../api';
  * растёт там, где новое правило/бюджет может добавить категорию, которой ещё не было в списке.
  */
 export function useCategories(version = 0, scope?: 'user'): ApiQueryResult<string[]> {
-    return useApiQuery<string[]>((signal) => fetchCategories(signal, scope), [version, scope]);
+    return useApiQuery<string[]>((signal) => fetchCategories(signal, scope), [version, scope], 'Не удалось загрузить категории');
 }

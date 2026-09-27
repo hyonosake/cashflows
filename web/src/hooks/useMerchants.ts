@@ -9,5 +9,5 @@ import type { MerchantSummaryDto } from '../../../shared/types';
  * или любого другого CRUD/импорта — та же схема инвалидации, что у остальных хуков данных.
  */
 export function useMerchants(version: number): ApiQueryResult<MerchantSummaryDto[]> {
-    return useApiQuery<MerchantSummaryDto[]>((signal) => fetchMerchants(signal), [version]);
+    return useApiQuery<MerchantSummaryDto[]>((signal) => fetchMerchants(signal), [version], 'Не удалось загрузить мерчантов');
 }
