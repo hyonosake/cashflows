@@ -8,16 +8,21 @@ import type { WeekCell } from './WeekOperationsDialog';
  * Обзор календарного месяца, содержащего выбранную неделю (dashboard.monthOverview) —
  * дни до зарплаты + Доход(план)/Расходы/Баланс месяца (MonthBudgetSummary — доход это ПЛАН
  * по расписанию зарплаты из «Настроек», не факт из income-операций) + матрица категория×неделя трат месяца
- * (столбцы: План | Неделя 1..N | % от плана), сгруппированная по сфере (category_abstract).
+ * (столбцы: План | Неделя 1..N | Потрачено | % от плана), сгруппированная по сфере (category_abstract).
  * План — user_categories.month_limit_kopecks (необязательное поле, настраивается в
- * «Настройках» → CategoryKindsSection); «% от плана» — spentKopecks/limitKopecks за весь
- * месяц, «—», если план не задан. Каждая граница столбца (Категория|План, План|Неделя 1,
- * между соседними неделями, Неделя N|% от плана) — своя вертикальная линия, чтобы недели не
- * сливались друг с другом и с планом/итогом при сканировании строки глазами.
+ * «Настройках» → CategoryKindsSection); «Потрачено» — spentKopecks за весь месяц (та же сумма,
+ * что участвует в «% от плана» = spentKopecks/limitKopecks, «—», если план не задан, — просто
+ * показана отдельным столбцом как абсолютное число, а не только в процентах). Каждая граница
+ * столбца (Категория|План, План|Неделя 1, между соседними неделями, Неделя N|Потрачено) — своя
+ * вертикальная линия, чтобы недели не сливались друг с другом и с планом/итогом при сканировании
+ * строки глазами; «Потрачено»/«% от плана» — одна смысловая пара, без разделителя между ними.
  * Любая недельная сумма кликабельна, включая «0 ₽» и строку «Итого» группы — открывает
  * WeekOperationsDialog со списком вошедших в неё операций (пустой список для «0 ₽» — тоже
- * корректный ответ). Вся строка (не только «% от плана») заливается красным по нарастающей
- * с ростом % от плана — planRowBackground(); ниже 50% заливки нет, план не задан — тоже нет.
+ * корректный ответ); «Потрачено» кликабельна так же, но открывает операции за ВЕСЬ месяц
+ * (overview.month.from..to), а не за одну неделю — другой title у кнопки, чтобы отличать
+ * в тестах/тултипе от недельных ячеек. Вся строка (не только «% от плана») заливается красным
+ * по нарастающей с ростом % от плана — planRowBackground(); ниже 50% заливки нет, план не
+ * задан — тоже нет.
  */
 
 interface CategoryGroup {
@@ -113,20 +118,21 @@ interface WeekAmountCellProps {
     kopecks: number;
     onOpen: () => void;
     rowBackground?: string;
-    isFirstWeek: boolean;
+    className: string;
+    title?: string;
 }
 
-function WeekAmountCell({ kopecks, onOpen, rowBackground, isFirstWeek }: WeekAmountCellProps): JSX.Element {
+function WeekAmountCell({ kopecks, onOpen, rowBackground, className, title = 'Показать операции' }: WeekAmountCellProps): JSX.Element {
     return (
         <td
-            className={`table-amount-right month-overview-col-week${isFirstWeek ? ' month-overview-col-week-start' : ''}`}
+            className={`table-amount-right ${className}`}
             style={rowBackground === undefined ? undefined : { backgroundColor: rowBackground }}
         >
             <button
                 type="button"
                 className={`month-overview-cell-btn${kopecks === 0 ? ' month-overview-zero' : ''}`}
                 onClick={onOpen}
-                title="Показать операции"
+                title={title}
             >
                 {formatMoneyWhole(kopecks)}
             </button>
@@ -138,10 +144,11 @@ interface SubtotalRowProps {
     field: string;
     items: MonthOverviewCategoryDto[];
     weeks: MonthOverviewWeekDto[];
+    month: { from: string; to: string };
     onOpenCell: (cell: WeekCell) => void;
 }
 
-function SubtotalRow({ field, items, weeks, onOpenCell }: SubtotalRowProps): JSX.Element {
+function SubtotalRow({ field, items, weeks, month, onOpenCell }: SubtotalRowProps): JSX.Element {
     const limit = sumLimit(items);
     const spent = sumSpent(items);
     const pct = planPct(spent, limit);
@@ -162,12 +169,19 @@ function SubtotalRow({ field, items, weeks, onOpenCell }: SubtotalRowProps): JSX
                     key={week.index}
                     kopecks={sumWeek(items, week.index - 1)}
                     rowBackground={rowBackground}
-                    isFirstWeek={week.index === 1}
+                    className={`month-overview-col-week${week.index === 1 ? ' month-overview-col-week-start' : ''}`}
                     onOpen={() =>
                         onOpenCell({ title: `${field} · Неделя ${week.index}`, categories, from: week.from, to: week.to })
                     }
                 />
             ))}
+            <WeekAmountCell
+                kopecks={spent}
+                rowBackground={rowBackground}
+                className="month-overview-col-total"
+                title="Показать операции за месяц"
+                onOpen={() => onOpenCell({ title: `${field} · Весь месяц`, categories, from: month.from, to: month.to })}
+            />
             <td
                 className={`table-amount-right month-overview-col-status${over ? ' month-overview-plan-status-over' : ''}`}
                 style={rowStyle}
@@ -181,11 +195,12 @@ function SubtotalRow({ field, items, weeks, onOpenCell }: SubtotalRowProps): JSX
 interface CategoryRowProps {
     item: MonthOverviewCategoryDto;
     weeks: MonthOverviewWeekDto[];
+    month: { from: string; to: string };
     grouped: boolean;
     onOpenCell: (cell: WeekCell) => void;
 }
 
-function CategoryRow({ item, weeks, grouped, onOpenCell }: CategoryRowProps): JSX.Element {
+function CategoryRow({ item, weeks, month, grouped, onOpenCell }: CategoryRowProps): JSX.Element {
     const pct = planPct(item.spentKopecks, item.limitKopecks);
     const rowBackground = planRowBackground(pct);
     const rowStyle = rowBackground === undefined ? undefined : { backgroundColor: rowBackground };
@@ -203,7 +218,7 @@ function CategoryRow({ item, weeks, grouped, onOpenCell }: CategoryRowProps): JS
                     key={week.index}
                     kopecks={item.weeklySpentKopecks[week.index - 1] ?? 0}
                     rowBackground={rowBackground}
-                    isFirstWeek={week.index === 1}
+                    className={`month-overview-col-week${week.index === 1 ? ' month-overview-col-week-start' : ''}`}
                     onOpen={() =>
                         onOpenCell({
                             title: `${item.name} · Неделя ${week.index}`,
@@ -214,6 +229,15 @@ function CategoryRow({ item, weeks, grouped, onOpenCell }: CategoryRowProps): JS
                     }
                 />
             ))}
+            <WeekAmountCell
+                kopecks={item.spentKopecks}
+                rowBackground={rowBackground}
+                className="month-overview-col-total"
+                title="Показать операции за месяц"
+                onOpen={() =>
+                    onOpenCell({ title: `${item.name} · Весь месяц`, categories: [item.name], from: month.from, to: month.to })
+                }
+            />
             <td
                 className={`table-amount-right month-overview-col-status${over ? ' month-overview-plan-status-over' : ''}`}
                 style={rowStyle}
@@ -282,7 +306,7 @@ interface Props {
 export function MonthOverview({ dashboard, version, onDataChanged }: Props): JSX.Element {
     const overview = dashboard.monthOverview;
     const weeks = overview.weeks;
-    const colSpan = weeks.length + 3; // Категория + План + недели + % от плана
+    const colSpan = weeks.length + 4; // Категория + План + недели + Потрачено + % от плана
     const [cell, setCell] = useState<WeekCell | null>(null);
 
     return (
@@ -321,6 +345,7 @@ export function MonthOverview({ dashboard, version, onDataChanged }: Props): JSX
                                         Неделя {week.index}
                                     </th>
                                 ))}
+                                <th className="table-amount-right month-overview-col-total">Потрачено</th>
                                 <th className="table-amount-right month-overview-col-status">% от плана</th>
                             </tr>
                         </thead>
@@ -333,12 +358,19 @@ export function MonthOverview({ dashboard, version, onDataChanged }: Props): JSX
                                             key={item.name}
                                             item={item}
                                             weeks={weeks}
+                                            month={overview.month}
                                             grouped={group.field !== null}
                                             onOpenCell={setCell}
                                         />
                                     ))}
                                     {group.field !== null && group.items.length > 1 && (
-                                        <SubtotalRow field={group.field} items={group.items} weeks={weeks} onOpenCell={setCell} />
+                                        <SubtotalRow
+                                            field={group.field}
+                                            items={group.items}
+                                            weeks={weeks}
+                                            month={overview.month}
+                                            onOpenCell={setCell}
+                                        />
                                     )}
                                 </Fragment>
                             ))}

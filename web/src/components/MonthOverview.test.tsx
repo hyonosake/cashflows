@@ -8,10 +8,13 @@ import { fetchCategories, fetchOperations } from '../api';
 /**
  * Обзор месяца (dashboard.monthOverview): заголовок с названием месяца, дни до
  * зарплаты (или подсказка настроить её), матрица категория×неделя трат месяца
- * (План | Неделя 1..N | % от плана), сгруппированная по сфере (categoryAbstract)
- * с заголовком группы и строкой «Итого». Ненулевая недельная сумма — кнопка,
- * открывающая WeekOperationsDialog со списком операций (мокаем fetchOperations/
- * fetchCategories — без сети). Нулевая сумма — обычный текст, не кликабельна.
+ * (План | Неделя 1..N | Потрачено | % от плана), сгруппированная по сфере (categoryAbstract)
+ * с заголовком группы и строкой «Итого». Любая сумма — кнопка, открывающая
+ * WeekOperationsDialog со списком операций (мокаем fetchOperations/fetchCategories — без
+ * сети): недельные — за свою неделю (title="Показать операции"), «Потрачено» — за весь
+ * месяц (title="Показать операции за месяц", overview.month.from..to). Разные title
+ * нужны, чтобы различать кнопки в тестах — при спентах, совпадающих по значению
+ * (например один месяц = одна неделя), запросы по тексту иначе были бы неоднозначны.
  */
 
 vi.mock('../api', async (importOriginal) => {
@@ -133,6 +136,46 @@ describe('MonthOverview', () => {
         expect(screen.getByText('Табак')).toBeInTheDocument();
     });
 
+    it('столбец «Потрачено» показывает сумму за месяц, а не отдельную неделю', () => {
+        renderOverview({
+            weeks: [
+                { index: 1, from: '2026-09-01', to: '2026-09-06' },
+                { index: 2, from: '2026-09-07', to: '2026-09-13' },
+            ],
+            categories: [
+                {
+                    name: 'Табак',
+                    categoryAbstract: null,
+                    limitKopecks: null,
+                    weeklySpentKopecks: [300_000, 600_000],
+                    spentKopecks: 900_000,
+                },
+            ],
+        });
+        expect(screen.getByText('Потрачено')).toBeInTheDocument();
+        expect(screen.getByText('3 000 ₽')).toBeInTheDocument(); // неделя 1
+        expect(screen.getByText('6 000 ₽')).toBeInTheDocument(); // неделя 2
+        expect(screen.getByText('9 000 ₽')).toBeInTheDocument(); // «Потрачено» за месяц
+    });
+
+    it('клик по «Потрачено» открывает попап за весь месяц, а не за одну неделю', async () => {
+        fetchOperationsMock.mockResolvedValueOnce({ items: [], total: 0, page: 1, limit: 200 });
+        const user = userEvent.setup();
+        renderOverview({
+            categories: [
+                { name: 'Табак', categoryAbstract: null, limitKopecks: null, weeklySpentKopecks: [300_000], spentKopecks: 300_000 },
+            ],
+        });
+
+        await user.click(screen.getByTitle('Показать операции за месяц'));
+
+        expect(fetchOperationsMock).toHaveBeenCalledExactlyOnceWith(
+            expect.objectContaining({ categories: ['Табак'], from: '2026-09-01', to: '2026-09-30' }),
+            expect.anything(),
+        );
+        expect(await screen.findByText('Табак · Весь месяц')).toBeInTheDocument();
+    });
+
     it('план и % от плана; «—», если план не задан', () => {
         renderOverview({
             categories: [
@@ -188,8 +231,9 @@ describe('MonthOverview', () => {
 
         expect(screen.getByText('Психология и здоровье')).toBeInTheDocument();
         expect(screen.getByText('Итого')).toBeInTheDocument();
-        // 22 000 + 16 068 = 38 068 ₽ (сумма недельных трат группы за единственную неделю)
-        expect(screen.getByText('38 068 ₽')).toBeInTheDocument();
+        // 22 000 + 16 068 = 38 068 ₽ (сумма недельных трат группы за единственную неделю —
+        // при одной неделе в месяце совпадает и с недельной ячейкой, и со столбцом «Потрачено»).
+        expect(screen.getAllByText('38 068 ₽')).toHaveLength(2);
 
         // У категории без сферы («Табак») своего заголовка группы/строки «Итого» нет.
         const tabakRow = screen.getByText('Табак').closest('tr') as HTMLElement;
@@ -204,8 +248,11 @@ describe('MonthOverview', () => {
                 { name: 'Табак', categoryAbstract: null, limitKopecks: null, weeklySpentKopecks: [0], spentKopecks: 0 },
             ],
         });
-        const cell = screen.getByText('0 ₽');
+        // По названию '0 ₽' теперь два элемента (неделя + «Потрачено» за месяц, тоже 0) —
+        // недельную ячейку отличает title, у месячной он другой.
+        const cell = screen.getByTitle('Показать операции');
         expect(cell.tagName).toBe('BUTTON');
+        expect(cell.textContent).toBe('0 ₽');
         expect(cell.className).toContain('month-overview-zero');
     });
 
@@ -218,7 +265,7 @@ describe('MonthOverview', () => {
             ],
         });
 
-        await user.click(screen.getByText('0 ₽'));
+        await user.click(screen.getByTitle('Показать операции'));
 
         expect(fetchOperationsMock).toHaveBeenCalledExactlyOnceWith(
             expect.objectContaining({ categories: ['Табак'], from: '2026-09-01', to: '2026-09-06' }),
