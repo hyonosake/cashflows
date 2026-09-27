@@ -10,6 +10,8 @@ import { importRoutes } from './routes/import.js';
 import { operationsRoutes } from './routes/operations.js';
 import { dashboardRoutes } from './routes/dashboard.js';
 import { categoryRoutes } from './routes/categories.js';
+import { categoryMappingRoutes } from './routes/categoryMappings.js';
+import { categoryAreaRoutes } from './routes/categoryAreas.js';
 import { goalRoutes } from './routes/goals.js';
 import { merchantRoutes } from './routes/merchants.js';
 import { settingsRoutes } from './routes/settings.js';
@@ -72,6 +74,8 @@ export async function buildFastify(db: Db, config: Config): Promise<FastifyInsta
     await fastify.register(operationsRoutes);
     await fastify.register(dashboardRoutes);
     await fastify.register(categoryRoutes);
+    await fastify.register(categoryMappingRoutes);
+    await fastify.register(categoryAreaRoutes);
     await fastify.register(goalRoutes);
     await fastify.register(merchantRoutes);
     await fastify.register(settingsRoutes);
