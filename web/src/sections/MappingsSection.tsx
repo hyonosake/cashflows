@@ -1,15 +1,17 @@
 import { useMemo, useState } from 'react';
 import { apiErrorText, createCustomMapping, createMcMapping, deleteCustomMapping, deleteMcMapping } from '../api';
 import { useCategoryFields } from '../hooks/useCategoryFields';
+import { useConfirmDelete } from '../hooks/useConfirmDelete';
 import { useMcMappings } from '../hooks/useMcMappings';
 import { useMccOptions } from '../hooks/useMccOptions';
 import { useCustomMappings } from '../hooks/useCustomMappings';
+import { CategorySelect } from '../components/CategorySelect';
 import { CollapsibleSection } from '../components/ui/CollapsibleSection';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { ErrorBanner } from '../components/ui/ErrorBanner';
 import { SearchableSelect } from '../components/ui/SearchableSelect';
-import { Spinner } from '../components/ui/Spinner';
-import { categoryOptionLabel } from '../format';
+import { MappingRuleForm } from './mappings/MappingRuleForm';
+import { MappingRuleList } from './mappings/MappingRuleList';
 
 /**
  * Секция «Настройки» — «Специальные правила категоризации»: два правила ПОМИМО мерчанта
@@ -58,9 +60,8 @@ export function MappingsSection({ version, onDataChanged }: Props): JSX.Element 
     const [customForm, setCustomForm] = useState({ matchValue: '', targetCategory: '' });
     const [error, setError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
-    const [pendingDeleteMcc, setPendingDeleteMcc] = useState<string | null>(null);
-    const [pendingDeleteCustomId, setPendingDeleteCustomId] = useState<number | null>(null);
-    const [busy, setBusy] = useState(false);
+    const mccDelete = useConfirmDelete<string>();
+    const customDelete = useConfirmDelete<number>();
 
     const saveMcc = async (): Promise<void> => {
         if (mccForm.mcc.trim() === '' || mccForm.targetCategory.trim() === '') {
@@ -99,30 +100,22 @@ export function MappingsSection({ version, onDataChanged }: Props): JSX.Element 
     };
 
     const removeMcc = async (mcc: string): Promise<void> => {
-        setPendingDeleteMcc(null);
-        setBusy(true);
-        setError(null);
         try {
             await deleteMcMapping(mcc);
             onDataChanged();
         } catch (e: unknown) {
             setError(apiErrorText(e));
-        } finally {
-            setBusy(false);
+            throw e;
         }
     };
 
     const removeCustom = async (id: number): Promise<void> => {
-        setPendingDeleteCustomId(null);
-        setBusy(true);
-        setError(null);
         try {
             await deleteCustomMapping(id);
             onDataChanged();
         } catch (e: unknown) {
             setError(apiErrorText(e));
-        } finally {
-            setBusy(false);
+            throw e;
         }
     };
 
@@ -137,70 +130,34 @@ export function MappingsSection({ version, onDataChanged }: Props): JSX.Element 
                 Подстрока в «Сообщении» — например, по имени конкретного отправителя. Проверяется
                 первым, до мерчанта и MCC.
             </p>
-            <form
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    void saveCustom();
-                }}
+            <MappingRuleForm
+                targetCategoryId="custom-target"
+                targetCategory={customForm.targetCategory}
+                onTargetCategoryChange={(next) => setCustomForm({ ...customForm, targetCategory: next })}
+                categories={categories}
+                categorySpheres={sphereByCategory}
+                submitting={saving}
+                onSubmit={() => void saveCustom()}
             >
-                <div className="form-grid">
-                    <div className="field">
-                        <label htmlFor="custom-value">Подстрока в сообщении</label>
-                        <input
-                            id="custom-value"
-                            value={customForm.matchValue}
-                            onChange={(e) => setCustomForm({ ...customForm, matchValue: e.target.value })}
-                            placeholder="за занятия"
-                        />
-                    </div>
-                    <div className="field">
-                        <label htmlFor="custom-target">Целевая категория</label>
-                        <SearchableSelect
-                            id="custom-target"
-                            value={customForm.targetCategory}
-                            onChange={(next) => setCustomForm({ ...customForm, targetCategory: next })}
-                            options={[
-                                { value: '', label: 'Выберите категорию…' },
-                                ...categories.map((c) => ({ value: c, label: categoryOptionLabel(c, sphereByCategory.get(c)) })),
-                            ]}
-                        />
-                    </div>
+                <div className="field">
+                    <label htmlFor="custom-value">Подстрока в сообщении</label>
+                    <input
+                        id="custom-value"
+                        value={customForm.matchValue}
+                        onChange={(e) => setCustomForm({ ...customForm, matchValue: e.target.value })}
+                        placeholder="за занятия"
+                    />
                 </div>
-                <div className="form-actions">
-                    <button type="submit" className="btn btn-primary" disabled={saving}>
-                        Добавить правило
-                    </button>
-                </div>
-            </form>
+            </MappingRuleForm>
             {categoryFieldsQuery.error !== null && <ErrorBanner message={categoryFieldsQuery.error} />}
             {customQuery.error !== null && <ErrorBanner message={customQuery.error} />}
-            {customQuery.loading && customMappings.length === 0 ? (
-                <div className="state-box">
-                    <Spinner />
-                </div>
-            ) : (
-                <div className="entity-list">
-                    {customMappings.length === 0 && <p className="empty">Правил по сообщению пока нет.</p>}
-                    {customMappings.map((m) => (
-                        <div className="entity-item" key={m.id}>
-                            <div className="entity-main">
-                                <div className="entity-title">{m.targetCategory}</div>
-                                <div className="entity-sub">содержит «{m.matchValue}»</div>
-                            </div>
-                            <div className="entity-actions">
-                                <button
-                                    type="button"
-                                    className="btn btn-small btn-danger"
-                                    disabled={busy}
-                                    onClick={() => setPendingDeleteCustomId(m.id)}
-                                >
-                                    Удалить
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
+            <MappingRuleList
+                rows={customMappings.map((m) => ({ key: m.id, title: m.targetCategory, subtitle: <>содержит «{m.matchValue}»</> }))}
+                loading={customQuery.loading}
+                emptyLabel="Правил по сообщению пока нет."
+                deleteBusy={customDelete.busy}
+                onRequestDelete={customDelete.requestDelete}
+            />
 
             <h3>2. По MCC-коду</h3>
             <p className="muted" style={{ marginTop: -6, marginBottom: 12 }}>
@@ -218,102 +175,68 @@ export function MappingsSection({ version, onDataChanged }: Props): JSX.Element 
                     мерчантов для выбора.
                 </p>
             ) : (
-                <form
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        void saveMcc();
-                    }}
+                <MappingRuleForm
+                    targetCategoryId="mcc-target"
+                    targetCategory={mccForm.targetCategory}
+                    onTargetCategoryChange={(next) => setMccForm({ ...mccForm, targetCategory: next })}
+                    categories={categories}
+                    categorySpheres={sphereByCategory}
+                    submitting={saving}
+                    onSubmit={() => void saveMcc()}
                 >
-                    <div className="form-grid">
-                        <div className="field">
-                            <label htmlFor="mcc-value">MCC (по примеру мерчанта)</label>
-                            <SearchableSelect
-                                id="mcc-value"
-                                value={mccForm.mcc}
-                                onChange={(next) => setMccForm({ ...mccForm, mcc: next })}
-                                options={[
-                                    { value: '', label: 'Выберите код…' },
-                                    ...mcOptions.map((opt) => ({
-                                        value: opt.mcc,
-                                        label: `${opt.mcc} — ${opt.examples.join(', ') || 'без примера'} (${opt.operationsCount})`,
-                                    })),
-                                ]}
-                            />
-                        </div>
-                        <div className="field">
-                            <label htmlFor="mcc-target">Целевая категория</label>
-                            <SearchableSelect
-                                id="mcc-target"
-                                value={mccForm.targetCategory}
-                                onChange={(next) => setMccForm({ ...mccForm, targetCategory: next })}
-                                options={[
-                                    { value: '', label: 'Выберите категорию…' },
-                                    ...categories.map((c) => ({ value: c, label: categoryOptionLabel(c, sphereByCategory.get(c)) })),
-                                ]}
-                            />
-                        </div>
+                    <div className="field">
+                        <label htmlFor="mcc-value">MCC (по примеру мерчанта)</label>
+                        <SearchableSelect
+                            id="mcc-value"
+                            value={mccForm.mcc}
+                            onChange={(next) => setMccForm({ ...mccForm, mcc: next })}
+                            options={[
+                                { value: '', label: 'Выберите код…' },
+                                ...mcOptions.map((opt) => ({
+                                    value: opt.mcc,
+                                    label: `${opt.mcc} — ${opt.examples.join(', ') || 'без примера'} (${opt.operationsCount})`,
+                                })),
+                            ]}
+                        />
                     </div>
-                    <div className="form-actions">
-                        <button type="submit" className="btn btn-primary" disabled={saving}>
-                            Добавить правило
-                        </button>
-                    </div>
-                </form>
+                </MappingRuleForm>
             )}
             {mcQuery.error !== null && <ErrorBanner message={mcQuery.error} />}
-            {mcQuery.loading && mcMappings.length === 0 ? (
-                <div className="state-box">
-                    <Spinner />
-                </div>
-            ) : (
-                <div className="entity-list">
-                    {mcMappings.length === 0 && <p className="empty">Правил по MCC пока нет.</p>}
-                    {mcMappings.map((m) => {
-                        const examples = exampleByMcc.get(m.mcc) ?? [];
-                        return (
-                            <div className="entity-item" key={m.mcc}>
-                                <div className="entity-main">
-                                    <div className="entity-title">{m.targetCategory}</div>
-                                    <div className="entity-sub">
-                                        MCC {m.mcc}
-                                        {examples.length > 0 && <> — например «{examples[0]}»</>}
-                                    </div>
-                                </div>
-                                <div className="entity-actions">
-                                    <button
-                                        type="button"
-                                        className="btn btn-small btn-danger"
-                                        disabled={busy}
-                                        onClick={() => setPendingDeleteMcc(m.mcc)}
-                                    >
-                                        Удалить
-                                    </button>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
+            <MappingRuleList
+                rows={mcMappings.map((m) => {
+                    const examples = exampleByMcc.get(m.mcc) ?? [];
+                    return {
+                        key: m.mcc,
+                        title: m.targetCategory,
+                        subtitle: (
+                            <>
+                                MCC {m.mcc}
+                                {examples.length > 0 && <> — например «{examples[0]}»</>}
+                            </>
+                        ),
+                    };
+                })}
+                loading={mcQuery.loading}
+                emptyLabel="Правил по MCC пока нет."
+                deleteBusy={mccDelete.busy}
+                onRequestDelete={mccDelete.requestDelete}
+            />
 
             <ConfirmDialog
-                open={pendingDeleteMcc !== null}
-                title={`Удалить правило MCC ${pendingDeleteMcc ?? ''}?`}
+                open={mccDelete.pending !== null}
+                title={`Удалить правило MCC ${mccDelete.pending ?? ''}?`}
                 confirmLabel="Удалить"
-                busy={busy}
-                onCancel={() => setPendingDeleteMcc(null)}
-                onConfirm={() => {
-                    if (pendingDeleteMcc !== null) void removeMcc(pendingDeleteMcc);
-                }}
+                busy={mccDelete.busy}
+                onCancel={mccDelete.cancel}
+                onConfirm={() => void mccDelete.confirm(removeMcc)}
             />
             <ConfirmDialog
-                open={pendingDeleteCustomId !== null}
+                open={customDelete.pending !== null}
                 title="Удалить правило по сообщению?"
                 confirmLabel="Удалить"
-                busy={busy}
-                onCancel={() => setPendingDeleteCustomId(null)}
-                onConfirm={() => {
-                    if (pendingDeleteCustomId !== null) void removeCustom(pendingDeleteCustomId);
-                }}
+                busy={customDelete.busy}
+                onCancel={customDelete.cancel}
+                onConfirm={() => void customDelete.confirm(removeCustom)}
             />
         </CollapsibleSection>
     );
