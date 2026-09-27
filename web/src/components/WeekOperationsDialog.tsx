@@ -1,18 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { OperationDto } from '../../../shared/types';
-import {
-    apiErrorText,
-    createCustomMapping,
-    createMcMapping,
-    fetchCategoryFields,
-    fetchOperations,
-    setMerchantCategory,
-    updateOperationCategory,
-} from '../api';
+import { useEffect, useMemo } from 'react';
+import { fetchCategoryFields, fetchOperations } from '../api';
 import { useApiQuery } from '../hooks/useApiQuery';
+import { useCreateRule } from '../hooks/useCreateRule';
 import { formatDate, formatMoneyWhole, pluralizeRu } from '../format';
 import { CreateRuleDialog } from './CreateRuleDialog';
-import type { CreateRuleInput } from './CreateRuleDialog';
 import { OperationsTable } from './OperationsTable';
 import { ErrorBanner } from './ui/ErrorBanner';
 
@@ -42,10 +33,6 @@ interface Props {
 const LIMIT = 200;
 
 export function WeekOperationsDialog({ cell, version, onClose, onDataChanged }: Props): JSX.Element {
-    const [ruleSource, setRuleSource] = useState<OperationDto | null>(null);
-    const [ruleSaving, setRuleSaving] = useState(false);
-    const [ruleError, setRuleError] = useState<string | null>(null);
-
     const key = `${cell.categories.join(',')}|${cell.from}|${cell.to}`;
     const query = useApiQuery(
         (signal) => fetchOperations({ categories: cell.categories, from: cell.from, to: cell.to, limit: LIMIT }, signal),
@@ -56,56 +43,23 @@ export function WeekOperationsDialog({ cell, version, onClose, onDataChanged }: 
     const categoryFields = categoryFieldsQuery.data ?? [];
     const categories = useMemo(() => categoryFields.map((f) => f.category), [categoryFields]);
     const categorySpheres = useMemo(() => new Map(categoryFields.map((f) => [f.category, f.field])), [categoryFields]);
+    const createRule = useCreateRule(() => {
+        onDataChanged();
+        query.reload();
+    });
 
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent): void => {
-            if (event.key === 'Escape' && ruleSource === null) onClose();
+            if (event.key === 'Escape' && createRule.source === null) onClose();
         };
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [ruleSource, onClose]);
+    }, [createRule.source, onClose]);
 
     const data = query.data;
     const items = data?.items ?? [];
     const total = data?.total ?? 0;
     const sumKopecks = items.reduce((sum, op) => sum + Math.abs(op.amountKopecks), 0);
-
-    async function saveRule(input: CreateRuleInput): Promise<void> {
-        setRuleSaving(true);
-        setRuleError(null);
-        try {
-            if (input.kind === 'merchant') {
-                await setMerchantCategory({ merchant: input.merchant, targetCategory: input.targetCategory });
-            } else if (input.kind === 'mcc') {
-                await createMcMapping({ mcc: input.mcc, targetCategory: input.targetCategory });
-            } else {
-                await createCustomMapping({ matchValue: input.matchValue, targetCategory: input.targetCategory });
-            }
-            setRuleSource(null);
-            onDataChanged();
-            query.reload();
-        } catch (e: unknown) {
-            setRuleError(apiErrorText(e));
-        } finally {
-            setRuleSaving(false);
-        }
-    }
-
-    async function saveRuleOnce(categoryUser: string): Promise<void> {
-        if (ruleSource === null) return;
-        setRuleSaving(true);
-        setRuleError(null);
-        try {
-            await updateOperationCategory(ruleSource.id, { categoryUser });
-            setRuleSource(null);
-            onDataChanged();
-            query.reload();
-        } catch (e: unknown) {
-            setRuleError(apiErrorText(e));
-        } finally {
-            setRuleSaving(false);
-        }
-    }
 
     return (
         <>
@@ -128,7 +82,7 @@ export function WeekOperationsDialog({ cell, version, onClose, onDataChanged }: 
                         )}
                     </p>
                     {query.error !== null && <ErrorBanner message={query.error} />}
-                    <OperationsTable items={items} loading={query.loading && data === null} onCreateRule={setRuleSource} />
+                    <OperationsTable items={items} loading={query.loading && data === null} onCreateRule={createRule.open} />
                     {total > items.length && (
                         <p className="muted">
                             Показаны первые {items.length} из {total}.
@@ -143,17 +97,14 @@ export function WeekOperationsDialog({ cell, version, onClose, onDataChanged }: 
             </div>
 
             <CreateRuleDialog
-                operation={ruleSource}
+                operation={createRule.source}
                 categories={categories}
                 categorySpheres={categorySpheres}
-                saving={ruleSaving}
-                error={ruleError}
-                onCancel={() => {
-                    setRuleSource(null);
-                    setRuleError(null);
-                }}
-                onSave={(input) => void saveRule(input)}
-                onSaveOnce={(categoryUser) => void saveRuleOnce(categoryUser)}
+                saving={createRule.saving}
+                error={createRule.error}
+                onCancel={createRule.cancel}
+                onSave={createRule.save}
+                onSaveOnce={createRule.saveOnce}
             />
         </>
     );

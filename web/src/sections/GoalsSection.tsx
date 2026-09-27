@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { GoalDto, GoalInputDto } from '../../../shared/types';
 import { apiErrorText, createGoal, deleteGoal, updateGoal } from '../api';
 import { useGoals } from '../hooks/useGoals';
+import { useConfirmDelete } from '../hooks/useConfirmDelete';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { ErrorBanner } from '../components/ui/ErrorBanner';
 import { Spinner } from '../components/ui/Spinner';
@@ -39,7 +40,7 @@ export function GoalsSection({ version, onDataChanged }: Props): JSX.Element {
     const [form, setForm] = useState<GoalFormState>(emptyGoalForm);
     const [error, setError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
-    const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+    const goalDelete = useConfirmDelete<number>();
 
     const saveGoal = async (): Promise<void> => {
         if (form.name.trim() === '') {
@@ -70,17 +71,17 @@ export function GoalsSection({ version, onDataChanged }: Props): JSX.Element {
     };
 
     const removeGoal = async (id: number): Promise<void> => {
-        setPendingDeleteId(null);
         try {
             await deleteGoal(id);
             if (form.id === id) setForm(emptyGoalForm());
             onDataChanged();
         } catch (e: unknown) {
             setError(apiErrorText(e));
+            throw e;
         }
     };
 
-    const pendingGoal = pendingDeleteId === null ? undefined : goals.find((g) => g.id === pendingDeleteId);
+    const pendingGoal = goalDelete.pending === null ? undefined : goals.find((g) => g.id === goalDelete.pending);
     const listLoading = goalsQuery.loading && goals.length === 0;
 
     return (
@@ -145,7 +146,12 @@ export function GoalsSection({ version, onDataChanged }: Props): JSX.Element {
                                 <button type="button" className="btn btn-small" onClick={() => setForm(goalToForm(g))}>
                                     Изменить
                                 </button>
-                                <button type="button" className="btn btn-small btn-danger" onClick={() => setPendingDeleteId(g.id)}>
+                                <button
+                                    type="button"
+                                    className="btn btn-small btn-danger"
+                                    disabled={goalDelete.busy}
+                                    onClick={() => goalDelete.requestDelete(g.id)}
+                                >
                                     Удалить
                                 </button>
                             </div>
@@ -158,10 +164,9 @@ export function GoalsSection({ version, onDataChanged }: Props): JSX.Element {
                 open={pendingGoal !== undefined}
                 title={`Удалить цель «${pendingGoal?.name ?? ''}»?`}
                 confirmLabel="Удалить"
-                onCancel={() => setPendingDeleteId(null)}
-                onConfirm={() => {
-                    if (pendingDeleteId !== null) void removeGoal(pendingDeleteId);
-                }}
+                busy={goalDelete.busy}
+                onCancel={goalDelete.cancel}
+                onConfirm={() => void goalDelete.confirm(removeGoal)}
             />
         </div>
     );

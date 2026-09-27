@@ -1,8 +1,6 @@
 import { useMemo, useState } from 'react';
-import type { OperationDto, OperationsResponse } from '../../../shared/types';
-import { apiErrorText, createCustomMapping, createMcMapping, setMerchantCategory, updateOperationCategory } from '../api';
+import type { OperationsResponse } from '../../../shared/types';
 import { CreateRuleDialog } from '../components/CreateRuleDialog';
-import type { CreateRuleInput } from '../components/CreateRuleDialog';
 import { OperationsFiltersBar } from '../components/OperationsFiltersBar';
 import type { OperationsFilterState } from '../components/OperationsFiltersBar';
 import { OperationsPager } from '../components/OperationsPager';
@@ -10,6 +8,7 @@ import { OperationsTable } from '../components/OperationsTable';
 import { ErrorBanner } from '../components/ui/ErrorBanner';
 import { useCategories } from '../hooks/useCategories';
 import { useCategoryFields } from '../hooks/useCategoryFields';
+import { useCreateRule } from '../hooks/useCreateRule';
 import { useOperations } from '../hooks/useOperations';
 import { formatDate } from '../format';
 import type { OperationsFilters } from '../api';
@@ -61,9 +60,7 @@ export function OperationsPage({ version, onDataChanged }: Props): JSX.Element {
     const [filters, setFilters] = useState<OperationsFilterState>(initialFilters);
     const [applied, setApplied] = useState<OperationsFilterState>(initialFilters);
     const [page, setPage] = useState(1);
-    const [ruleSource, setRuleSource] = useState<OperationDto | null>(null);
-    const [ruleSaving, setRuleSaving] = useState(false);
-    const [ruleError, setRuleError] = useState<string | null>(null);
+    const createRule = useCreateRule(onDataChanged);
 
     const categoriesQuery = useCategories(version);
     const categories = categoriesQuery.data ?? [];
@@ -88,42 +85,6 @@ export function OperationsPage({ version, onDataChanged }: Props): JSX.Element {
         setFilters(reset);
         setPage(1);
         setApplied(reset);
-    }
-
-    async function saveRule(input: CreateRuleInput): Promise<void> {
-        setRuleSaving(true);
-        setRuleError(null);
-        try {
-            if (input.kind === 'merchant') {
-                await setMerchantCategory({ merchant: input.merchant, targetCategory: input.targetCategory });
-            } else if (input.kind === 'mcc') {
-                await createMcMapping({ mcc: input.mcc, targetCategory: input.targetCategory });
-            } else {
-                await createCustomMapping({ matchValue: input.matchValue, targetCategory: input.targetCategory });
-            }
-            setRuleSource(null);
-            onDataChanged();
-        } catch (e: unknown) {
-            setRuleError(apiErrorText(e));
-        } finally {
-            setRuleSaving(false);
-        }
-    }
-
-    /** «Использовать и для прошлых, и для будущих» выключен — категория только этой операции. */
-    async function saveRuleOnce(categoryUser: string): Promise<void> {
-        if (ruleSource === null) return;
-        setRuleSaving(true);
-        setRuleError(null);
-        try {
-            await updateOperationCategory(ruleSource.id, { categoryUser });
-            setRuleSource(null);
-            onDataChanged();
-        } catch (e: unknown) {
-            setRuleError(apiErrorText(e));
-        } finally {
-            setRuleSaving(false);
-        }
     }
 
     return (
@@ -151,7 +112,7 @@ export function OperationsPage({ version, onDataChanged }: Props): JSX.Element {
             <OperationsTable
                 items={data?.items ?? []}
                 loading={operationsQuery.loading && data === null}
-                onCreateRule={setRuleSource}
+                onCreateRule={createRule.open}
             />
 
             <OperationsPager
@@ -163,17 +124,14 @@ export function OperationsPage({ version, onDataChanged }: Props): JSX.Element {
             />
 
             <CreateRuleDialog
-                operation={ruleSource}
+                operation={createRule.source}
                 categories={userCategories}
                 categorySpheres={categorySpheres}
-                saving={ruleSaving}
-                error={ruleError}
-                onCancel={() => {
-                    setRuleSource(null);
-                    setRuleError(null);
-                }}
-                onSave={(input) => void saveRule(input)}
-                onSaveOnce={(categoryUser) => void saveRuleOnce(categoryUser)}
+                saving={createRule.saving}
+                error={createRule.error}
+                onCancel={createRule.cancel}
+                onSave={createRule.save}
+                onSaveOnce={createRule.saveOnce}
             />
         </div>
     );
