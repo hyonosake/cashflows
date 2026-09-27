@@ -402,9 +402,12 @@ body {
 }
 
 .btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: 34px;
-    padding: 6px 0;
-    text-align: center;
+    height: 34px;
+    padding: 0;
     font-size: 15px;
 }
 
@@ -705,6 +708,26 @@ body {
     font-family: inherit;
 }
 
+/* Поле поиска (SearchInput) — иконка-лупа слева, иначе неотличимо от обычного текстового
+   поля; inline-flex сжимается по содержимому, так что явный width/maxWidth на самом
+   <input> (например MerchantsSection) по-прежнему работает как раньше. */
+.search-input {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.search-input .input-control {
+    padding-left: 30px;
+}
+
+.search-input svg {
+    position: absolute;
+    left: 10px;
+    color: var(--text-muted);
+    pointer-events: none;
+}
+
 .field input:focus,
 .field select:focus,
 .input-control:focus {
@@ -812,7 +835,9 @@ body {
 }
 
 /* Заголовок группы по сфере (category_abstract) — CategoryKindsSection, аналог группировки
-   строк по сфере в MonthOverview (.month-overview-group-header), но для списка, не таблицы. */
+   строк по сфере в MonthOverview (.month-overview-group-header), но для списка, не таблицы.
+   flex — чтобы кнопка «Изменить» (AreaGroupHeader) стояла рядом с названием, а не переносилась
+   отдельной строкой. */
 .entity-group-header {
     margin-top: 18px;
     padding: 8px 10px;
@@ -823,6 +848,23 @@ body {
     text-transform: uppercase;
     letter-spacing: 0.03em;
     border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+/* Режим редактирования сферы — обычный регистр (иначе uppercase/letter-spacing исказили бы
+   то, что реально печатает пользователь, и кнопки «Сохранить»/«Отмена»). */
+.entity-group-header-editing {
+    text-transform: none;
+    letter-spacing: normal;
+    font-weight: 600;
+}
+
+.entity-group-header-editing .input-control {
+    flex: 1;
+    max-width: 280px;
 }
 
 .entity-group-header + .entity-item {
@@ -836,6 +878,13 @@ body {
 
 .entity-title {
     font-weight: 600;
+}
+
+/* Название категории + кнопка «Изменить» (CategoryRow) — рядом, не как отдельные строки. */
+.entity-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .category-field-row {
@@ -950,10 +999,31 @@ body {
 
 /* --- SearchableSelect (комбобокс с текстовым поиском вместо нативного select) ---
    Список — position:fixed (не в потоке), координаты из getBoundingClientRect инпута
-   (см. компонент) — иначе обрезался бы overflow:auto у .table-wrap/.modal-wide. */
+   (см. компонент) — иначе обрезался бы overflow:auto у .table-wrap/.modal-wide.
+   Шеврон (▾) — единственный визуальный сигнал, что это дропдаун, а не обычное текстовое
+   поле (иначе неотличимо от <input>, особенно у коротких значений вроде тега категории —
+   AGENTS.md, «Конвенции кода»); pointer-events:none — клик проходит сквозь него к инпуту. */
 
 .searchable-select {
     position: relative;
+}
+
+.searchable-select input.input-control {
+    padding-right: 26px;
+}
+
+.searchable-select-chevron {
+    position: absolute;
+    right: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: var(--text-muted);
+    font-size: 10px;
+}
+
+.searchable-select input:disabled ~ .searchable-select-chevron {
+    opacity: 0.5;
 }
 
 .searchable-select-list {

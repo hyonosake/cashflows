@@ -2,6 +2,7 @@ import type { OperationType } from '../../../shared/types';
 import { todayIso } from '../periods';
 import { CategorySelect } from './CategorySelect';
 import { SearchableSelect } from './ui/SearchableSelect';
+import { SearchInput } from './ui/SearchInput';
 
 /**
  * Панель фильтров страницы «Операции»: период (даты по Москве), категория,
@@ -77,9 +78,8 @@ export function OperationsFiltersBar({ filters, categories, categorySpheres, onC
             </div>
             <div className="field">
                 <label htmlFor="ops-q">Поиск (описание/счёт)</label>
-                <input
+                <SearchInput
                     id="ops-q"
-                    type="search"
                     placeholder="подстрока…"
                     value={filters.q}
                     onChange={(e) => onChange({ ...filters, q: e.target.value })}

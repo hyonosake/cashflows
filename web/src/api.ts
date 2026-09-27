@@ -225,6 +225,14 @@ export function deleteUserCategory(name: string): Promise<void> {
     return request<void>(`/categories/${encodeURIComponent(name)}`, { method: 'DELETE' });
 }
 
+/** Переименование категории (кроме служебной «Без категории») — ссылки по id, без пересчёта. */
+export function renameUserCategory(name: string, newName: string): Promise<{ name: string }> {
+    return request<{ name: string }>(`/categories/${encodeURIComponent(name)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name: newName }),
+    });
+}
+
 export function fetchCategoryKinds(signal?: AbortSignal): Promise<CategoryKindDto[]> {
     return request<CategoryKindDto[]>('/categories/kinds', { signal });
 }
@@ -255,6 +263,14 @@ export function fetchCategoryAreas(signal?: AbortSignal): Promise<string[]> {
 /** Завести новую сферу отдельно от конкретной категории (в отличие от setCategoryField — find-or-create «попутно»). */
 export function createCategoryArea(name: string): Promise<{ name: string }> {
     return request<{ name: string }>('/categories/areas', { method: 'POST', body: JSON.stringify({ name }) });
+}
+
+/** Переименование сферы — категории ссылаются на неё по id, без пересчёта. */
+export function renameCategoryArea(name: string, newName: string): Promise<{ name: string }> {
+    return request<{ name: string }>(`/categories/areas/${encodeURIComponent(name)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name: newName }),
+    });
 }
 
 export function fetchCategoryLimits(signal?: AbortSignal): Promise<CategoryLimitDto[]> {

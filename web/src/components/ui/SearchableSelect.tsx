@@ -155,6 +155,9 @@ export function SearchableSelect({
                     }
                 }}
             />
+            <span className="searchable-select-chevron" aria-hidden="true">
+                ▾
+            </span>
             {open && rect !== null && (
                 <ul
                     ref={listRef}

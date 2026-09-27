@@ -5,6 +5,8 @@ import {
     createCategoryArea,
     createUserCategory,
     deleteUserCategory,
+    renameCategoryArea,
+    renameUserCategory,
     setCategoryField,
     setCategoryKind,
     setCategoryLimit,
@@ -19,6 +21,7 @@ import { CollapsibleSection } from '../components/ui/CollapsibleSection';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { ErrorBanner } from '../components/ui/ErrorBanner';
 import { Spinner } from '../components/ui/Spinner';
+import { AreaGroupHeader } from './category-kinds/AreaGroupHeader';
 import { CategoryRow } from './category-kinds/CategoryRow';
 import { InlineNameForm } from './category-kinds/InlineNameForm';
 
@@ -103,6 +106,8 @@ export function CategoryKindsSection({ version, onDataChanged }: Props): JSX.Ele
     const [busyCategory, setBusyCategory] = useState<string | null>(null);
     const [busyFieldCategory, setBusyFieldCategory] = useState<string | null>(null);
     const [busyLimitCategory, setBusyLimitCategory] = useState<string | null>(null);
+    const [busyRenameCategory, setBusyRenameCategory] = useState<string | null>(null);
+    const [busyRenameArea, setBusyRenameArea] = useState<string | null>(null);
     const [newCategoryName, setNewCategoryName] = useState('');
     const [creatingCategory, setCreatingCategory] = useState(false);
     const [newAreaName, setNewAreaName] = useState('');
@@ -171,6 +176,32 @@ export function CategoryKindsSection({ version, onDataChanged }: Props): JSX.Ele
             setError(apiErrorText(e, 'Не удалось сохранить сферу категории'));
         } finally {
             setBusyFieldCategory(null);
+        }
+    };
+
+    const handleRenameCategory = async (category: string, newName: string): Promise<void> => {
+        setBusyRenameCategory(category);
+        setError(null);
+        try {
+            await renameUserCategory(category, newName);
+            onDataChanged();
+        } catch (e: unknown) {
+            setError(apiErrorText(e, 'Не удалось переименовать категорию'));
+        } finally {
+            setBusyRenameCategory(null);
+        }
+    };
+
+    const handleRenameArea = async (area: string, newName: string): Promise<void> => {
+        setBusyRenameArea(area);
+        setError(null);
+        try {
+            await renameCategoryArea(area, newName);
+            onDataChanged();
+        } catch (e: unknown) {
+            setError(apiErrorText(e, 'Не удалось переименовать сферу'));
+        } finally {
+            setBusyRenameArea(null);
         }
     };
 
@@ -267,7 +298,13 @@ export function CategoryKindsSection({ version, onDataChanged }: Props): JSX.Ele
                     {kinds.length === 0 && <p className="empty">Категорий пока нет — сначала импортируйте операции.</p>}
                     {groups.map((group) => (
                         <div key={group.sphere ?? '\u0000without-sphere'}>
-                            <div className="entity-group-header">{group.sphere ?? 'Без сферы'}</div>
+                            <AreaGroupHeader
+                                sphere={group.sphere}
+                                renameBusy={busyRenameArea === group.sphere}
+                                onRename={(newName) => {
+                                    if (group.sphere !== null) void handleRenameArea(group.sphere, newName);
+                                }}
+                            />
                             {group.items.map((item) => {
                                 const hasField = fieldByCategory.has(item.category);
                                 const savedField = fieldByCategory.get(item.category) ?? '';
@@ -281,6 +318,8 @@ export function CategoryKindsSection({ version, onDataChanged }: Props): JSX.Ele
                                     <CategoryRow
                                         key={item.category}
                                         item={item}
+                                        renameBusy={busyRenameCategory === item.category}
+                                        onRename={(newName) => void handleRenameCategory(item.category, newName)}
                                         hasField={hasField}
                                         savedField={savedField ?? ''}
                                         areaOptions={areaOptions}

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { ChevronIcon } from './ChevronIcon';
 
 /**
  * Панель «Настроек» со сворачиваемым телом — секции со множеством записей (мерчанты,
@@ -21,8 +22,8 @@ export function CollapsibleSection({ title, defaultOpen = true, headHint, childr
     return (
         <div className="panel">
             <button type="button" className="collapsible-header" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-                <span className={`collapsible-chevron${open ? ' collapsible-chevron-open' : ''}`} aria-hidden="true">
-                    ▸
+                <span className={`collapsible-chevron${open ? ' collapsible-chevron-open' : ''}`}>
+                    <ChevronIcon />
                 </span>
                 <h2>{title}</h2>
                 {headHint}

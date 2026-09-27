@@ -1,16 +1,21 @@
+import { useState } from 'react';
 import type { CategoryKind, CategoryKindDto } from '../../../../shared/types';
 import { formatMoneyWhole } from '../../format';
+import { PencilIcon } from '../../components/ui/PencilIcon';
 import { SearchableSelect } from '../../components/ui/SearchableSelect';
+import { TrashIcon } from '../../components/ui/TrashIcon';
 
-const KIND_OPTIONS: Array<{ value: CategoryKind | null; label: string }> = [
+const KIND_OPTIONS: Array<{ value: string; label: string }> = [
     { value: 'fixed', label: 'Постоянная' },
     { value: 'variable', label: 'Переменная' },
     { value: 'reserve', label: 'Резерв' },
-    { value: null, label: '—' },
+    { value: '', label: '— (не размечено)' },
 ];
 
 interface Props {
     item: CategoryKindDto;
+    renameBusy: boolean;
+    onRename: (newName: string) => void;
     hasField: boolean;
     savedField: string;
     areaOptions: Array<{ value: string; label: string }>;
@@ -28,9 +33,11 @@ interface Props {
     onRequestDelete: () => void;
 }
 
-/** Одна строка списка категорий: тег постоянная/переменная/резерв + сфера + план на месяц + удаление. */
+/** Одна строка списка категорий: название (переименование) + тег + сфера + план на месяц + удаление. */
 export function CategoryRow({
     item,
+    renameBusy,
+    onRename,
     hasField,
     savedField,
     areaOptions,
@@ -47,10 +54,61 @@ export function CategoryRow({
     deleteBusy,
     onRequestDelete,
 }: Props): JSX.Element {
+    const [editingName, setEditingName] = useState(false);
+    const [nameDraft, setNameDraft] = useState(item.category);
+
+    const startEditingName = (): void => {
+        setNameDraft(item.category);
+        setEditingName(true);
+    };
+
+    const submitRename = (): void => {
+        const trimmed = nameDraft.trim();
+        if (trimmed === '' || trimmed === item.category) {
+            setEditingName(false);
+            return;
+        }
+        onRename(trimmed);
+    };
+
     return (
         <div className="entity-item">
             <div className="entity-main">
-                <div className="entity-title">{item.category}</div>
+                {editingName ? (
+                    <div className="category-field-row">
+                        <input
+                            className="input-control"
+                            aria-label={`Новое имя категории ${item.category}`}
+                            value={nameDraft}
+                            disabled={renameBusy}
+                            autoFocus
+                            onChange={(e) => setNameDraft(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') submitRename();
+                                if (e.key === 'Escape') setEditingName(false);
+                            }}
+                        />
+                        <button type="button" className="btn btn-small" disabled={renameBusy || nameDraft.trim() === ''} onClick={submitRename}>
+                            Сохранить
+                        </button>
+                        <button type="button" className="btn btn-small" disabled={renameBusy} onClick={() => setEditingName(false)}>
+                            Отмена
+                        </button>
+                    </div>
+                ) : (
+                    <div className="entity-title-row">
+                        <span className="entity-title">{item.category}</span>
+                        <button
+                            type="button"
+                            className="btn btn-icon"
+                            onClick={startEditingName}
+                            aria-label={`Переименовать категорию ${item.category}`}
+                            title="Переименовать категорию"
+                        >
+                            <PencilIcon />
+                        </button>
+                    </div>
+                )}
                 {hasField && (
                     <div className="category-field-row">
                         <SearchableSelect
@@ -79,19 +137,22 @@ export function CategoryRow({
                 </div>
             </div>
             <div className="entity-actions">
-                {KIND_OPTIONS.map((option) => (
-                    <button
-                        key={option.label}
-                        type="button"
-                        className={`btn btn-small${item.kind === option.value ? ' btn-primary' : ''}`}
-                        disabled={kindBusy}
-                        onClick={() => onSetKind(option.value)}
-                    >
-                        {option.label}
-                    </button>
-                ))}
-                <button type="button" className="btn btn-small btn-danger" disabled={deleteBusy} onClick={onRequestDelete}>
-                    Удалить
+                <SearchableSelect
+                    value={item.kind ?? ''}
+                    options={KIND_OPTIONS}
+                    disabled={kindBusy}
+                    aria-label={`Тег категории ${item.category}`}
+                    onChange={(next) => onSetKind(next === '' ? null : (next as CategoryKind))}
+                />
+                <button
+                    type="button"
+                    className="btn btn-icon btn-danger"
+                    disabled={deleteBusy}
+                    onClick={onRequestDelete}
+                    aria-label={`Удалить категорию ${item.category}`}
+                    title="Удалить категорию"
+                >
+                    <TrashIcon />
                 </button>
             </div>
         </div>

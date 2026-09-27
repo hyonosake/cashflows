@@ -5,6 +5,7 @@ import { useMerchants } from '../hooks/useMerchants';
 import { CategorySelect } from '../components/CategorySelect';
 import { CollapsibleSection } from '../components/ui/CollapsibleSection';
 import { ErrorBanner } from '../components/ui/ErrorBanner';
+import { SearchInput } from '../components/ui/SearchInput';
 import { Spinner } from '../components/ui/Spinner';
 import { formatMoney } from '../format';
 
@@ -97,9 +98,7 @@ export function MerchantsSection({ version, onDataChanged }: Props): JSX.Element
                         categorySpheres={sphereByCategory}
                         placeholder="Все категории"
                     />
-                    <input
-                        type="search"
-                        className="input-control"
+                    <SearchInput
                         placeholder="Поиск по названию…"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}

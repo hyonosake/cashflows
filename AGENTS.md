@@ -85,14 +85,20 @@ web/               React SPA (Vite, root web/), 4 таба (App.tsx): Дашбо
                    CategorySelect с fallbackOption «(банк)» для ещё неразмеченных),
                    CategoryKindsSection (контейнер «Настройки категорий»: считает группировку
                    по сфере + рендерит category-kinds/InlineNameForm дважды («Новая категория»/
-                   «Новая сфера» — идентичная форма) и один category-kinds/CategoryRow на
-                   категорию — тег fixed/variable/reserve, «сфера» (SearchableSelect из
-                   category_abstract, заводится отдельно полем «Новая сфера» — GET/POST
-                   /api/categories/areas, без привязки к конкретной категории), «План на
-                   месяц» = month_limit_kopecks, «Удалить» с ConfirmDialog (useConfirmDelete)
-                   — DELETE /api/categories/:category, кроме служебной «Без категории»;
-                   список сгруппирован по сфере заголовками (алфавит сферы, категории без
-                   сферы — блоком «Без сферы» в конце), как строки MonthOverview)
+                   «Новая сфера» — идентичная форма), category-kinds/AreaGroupHeader на каждую
+                   группу (заголовок сферы + инлайн-переименование, PUT /api/categories/areas/:area,
+                   кроме псевдо-группы «Без сферы» — переименовывать нечего) и один
+                   category-kinds/CategoryRow на категорию — инлайн-переименование (карандаш,
+                   PUT /api/categories/:category), тег fixed/variable/reserve выпадашкой
+                   (SearchableSelect, не кнопки), «сфера» (SearchableSelect из category_abstract,
+                   заводится отдельно полем «Новая сфера» — GET/POST /api/categories/areas, без
+                   привязки к конкретной категории), «План на месяц» = month_limit_kopecks,
+                   «Удалить» иконкой (TrashIcon) с ConfirmDialog (useConfirmDelete) — DELETE
+                   /api/categories/:category, кроме служебной «Без категории» (её нельзя ни
+                   удалить, ни переименовать, ни переименовать ДРУГУЮ категорию в неё —
+                   domain/categories.ts → renameUserCategory/deleteUserCategory); список
+                   сгруппирован по сфере заголовками (алфавит сферы, категории без сферы —
+                   блоком «Без сферы» в конце), как строки MonthOverview)
   components/      MonthOverview (матрица категория×неделя: Категория | План | Неделя 1..N |
                    Потрачено | % от плана, группировка по category_abstract со строкой «Итого»;
                    любая сумма кликабельна, включая «0 ₽» и «Итого» — недельная открывает
@@ -104,11 +110,16 @@ web/               React SPA (Vite, root web/), 4 таба (App.tsx): Дашбо
                    OperationsFiltersBar/OperationsPager, CategoryBreakdown (донат, Recharts),
                    ExpenseKindSummary (стек-бар постоянные/переменные/не размечено), SummaryCards
                    (KPI недели), GoalList, ImportPanel/ImportStats, WeekSwitcher,
-                   ui/ (CollapsibleSection, ConfirmDialog, ErrorBanner, Spinner, SearchableSelect —
-                   комбобокс с текстовым поиском по вариантам, замена ВСЕХ нативных <select> в
-                   приложении; список рисуется position:fixed по координатам инпута, закрывается
-                   при скролле СТРАНИЦЫ, но игнорирует скролл внутри себя же — иначе длинный
-                   список закрывался бы при попытке прокрутить его колесом мыши), CategorySelect
+                   ui/ (CollapsibleSection — аккордеон, шеврон ChevronIcon поворачивается на 90°
+                   при раскрытии, ConfirmDialog, ErrorBanner, Spinner, SearchInput (иконка-лупа
+                   слева, обёртка над <input type="search">), SearchableSelect — комбобокс с
+                   текстовым поиском по вариантам, замена ВСЕХ нативных <select> в приложении,
+                   рисует шеврон ▾ сам (единый признак «это дропдаун»); список рисуется
+                   position:fixed по координатам инпута, закрывается при скролле СТРАНИЦЫ, но
+                   игнорирует скролл внутри себя же — иначе длинный список закрывался бы при
+                   попытке прокрутить его колесом мыши; PencilIcon/TrashIcon/ChevronIcon/
+                   SearchIcon — инлайн-SVG без иконочной библиотеки, см. «Конвенции кода» →
+                   UI-паттерны), CategorySelect
                    (обёртка над SearchableSelect для выбора категории — единственное место, где
                    строится список вариантов «категория со сферой»: categoryOptionLabel(c,
                    sphere) + опциональный placeholder-пункт + fallbackOption для значения вне
@@ -193,12 +204,12 @@ curl -F "file=@samples/sample-operations.csv" http://localhost:3000/api/import  
 | `GET/POST/PUT/DELETE /api/goals[/:id]` | CRUD целей; тело `{name, amountKopecks}` — БЕЗ категорий и прогресса |
 | `GET /api/merchants` | мерчанты (`operations.description`) ЗА ВСЁ ВРЕМЯ: сумма расходов, кол-во операций, текущая категория, `mixedCategories`, по убыванию суммы |
 | `PUT /api/merchants/category` | тело `{merchant, targetCategory}` — прямой FK `merchants.user_category_id` на весь мерчант, живой JOIN, пересчёт не нужен |
-| `GET/POST/DELETE /api/categories[/:category]` | без `?scope` — категории пользователя + служебная «Без категории» (для фильтра операций); `?scope=user` — БЕЗ «Без категории» (выбор целевой категории); DELETE удаляет категорию (кроме «Без категории» — 400) и одной транзакцией снимает на неё все ссылки (override операций и `merchants.user_category_id` → NULL, mcc/custom-правила на неё → удаляются) — операции, ссылавшиеся ТОЛЬКО на неё, становятся «Без категории» сами через живой VIEW |
+| `GET/POST/PUT/DELETE /api/categories[/:category]` | без `?scope` — категории пользователя + служебная «Без категории» (для фильтра операций); `?scope=user` — БЕЗ «Без категории» (выбор целевой категории); PUT тело `{name}` — переименование (ссылки — по id/FK, каскад не нужен; нельзя переименовать «Без категории» и нельзя переименовать ДРУГУЮ категорию в неё); DELETE удаляет категорию (кроме «Без категории» — 400) и одной транзакцией снимает на неё все ссылки (override операций и `merchants.user_category_id` → NULL, mcc/custom-правила на неё → удаляются) — операции, ссылавшиеся ТОЛЬКО на неё, становятся «Без категории» сами через живой VIEW |
 | `GET/POST/DELETE /api/categories/mcc-mappings[/:mcc]` | правило `mcc → targetCategory`, один код — одно правило |
 | `GET/POST/DELETE /api/categories/custom-mappings[/:id]` | правило по подстроке в `message` («Сообщение» из CSV) — высший приоритет среди авто-правил |
 | `GET/PUT /api/categories/kinds[/:category]` | тег `fixed\|variable\|reserve\|null` (`user_categories.type`) |
 | `GET/PUT /api/categories/fields[/:category]` | «сфера» (`category_abstract`) поверх категории — группировка строк в MonthOverview |
-| `GET/POST /api/categories/areas` | сферы (`category_abstract`) как самостоятельный список: все существующие имена + создание новой БЕЗ привязки к категории (в отличие от `PUT /fields/:category`, которая заводит сферу «попутно», find-or-create по имени) |
+| `GET/POST/PUT /api/categories/areas[/:area]` | сферы (`category_abstract`) как самостоятельный список: все существующие имена + создание новой БЕЗ привязки к категории (в отличие от `PUT /fields/:category`, которая заводит сферу «попутно», find-or-create по имени); PUT тело `{name}` — переименование сферы (ссылки — по id/FK, каскад не нужен) |
 | `GET/PUT /api/categories/limits[/:category]` | план на месяц (`month_limit_kopecks`, положительное целое либо `null`) — колонки «План»/«% от плана» в MonthOverview |
 | `GET/PUT /api/settings` | `{salaryDays: number[]}` (дни 1..31); PUT перезаписывает целиком |
 | `GET /api/debug/tables` | служебный дамп: каждая таблица БД целиком по имени + первые 10 строк «как есть» (вкладка Debug) |
@@ -317,6 +328,31 @@ EXISTS` + `CREATE VIEW` при каждом старте достаточно. �
   изменений из `App.tsx`, растёт после импорта/любого CRUD, вызывает перезагрузку данных).
 - CSS: один файл `web/src/styles.css` с переменными (`:root` + `:root[data-theme='dark']` для тёмной
   темы). Никаких CSS-in-JS.
+- UI-паттерны (без иконочной библиотеки — каждая иконка инлайн-SVG в `components/ui/*Icon.tsx`,
+  ~15×15, `stroke="currentColor"`, без внешних зависимостей, по образцу уже существующих —
+  не тащить lucide/heroicons/etc.):
+  - Действие «изменить/переименовать» в списке (категория, сфера) — иконка-кнопка
+    (`PencilIcon`, класс `btn btn-icon`), не текст «Изменить»: список записей плотный,
+    иконка не удлиняет строку и сразу узнаваема; обязателен `aria-label`/`title` с полным
+    текстом действия (кнопка без видимого текста), например `Переименовать категорию ${name}`.
+  - Действие «удалить» в списке — аналогично иконка (`TrashIcon`, `btn btn-icon btn-danger`),
+    не текст «Удалить» (кроме кнопки ПОДТВЕРЖДЕНИЯ внутри самого `ConfirmDialog` — там кнопка
+    одна и без подписи неоднозначна, текст сохраняется).
+  - Любой дропдаун (`SearchableSelect`) — шеврон ▾ обязателен (сам компонент рисует его для
+    всех использований разом): иначе комбобокс неотличим от обычного текстового поля, особенно
+    при коротких значениях (тег категории, «Все категории» и т.п.).
+  - Поле поиска — обёртка `components/ui/SearchInput` (иконка-лупа слева) вместо голого
+    `<input type="search">`; используется, где семантика поля — именно поиск/фильтр по
+    подстроке (не любой текстовый инпут).
+  - Аккордеон (`CollapsibleSection`) — шеврон (`ChevronIcon`), поворачивается на 90° при
+    раскрытии; уже реализовано, не переизобретать для новых сворачиваемых блоков — оборачивать
+    в тот же компонент.
+  - Инлайн-переименование (категория/сфера — `CategoryRow`/`AreaGroupHeader`) — паттерн: иконка
+    «карандаш» переключает текст на `<input>` + «Сохранить»/«Отмена» тут же на месте (не модалка,
+    не отдельная страница), Enter сохраняет, Escape отменяет; состояние редактирования — локальный
+    `useState` компонента строки, сама мутация и её busy/error — у контейнера секции (тот же
+    принцип, что и `useConfirmDelete`/`useCreateRule` — UI-состояние живёт как можно ближе к
+    разметке, состояние данных/сети — в контейнере).
 - Тесты (vitest + Testing Library): файлы `*.test.ts(x)` рядом с исходником; глобали vitest НЕ включены —
   явные импорты `describe/it/expect/vi` из `'vitest'`; тесты без сети — `fetch`/`web/src/api.ts` мокаются
   (`vi.stubGlobal('fetch')`, `vi.mock`), сервер :3000 не запускается. Конфиг — `vitest.config.ts`
@@ -336,8 +372,10 @@ EXISTS` + `CREATE VIEW` при каждом старте достаточно. �
 - `category_abstract` («группа»/сфера) назначается категории по одной за раз, выбором из
   SearchableSelect (`CategoryKindsSection`; сама сфера заводится отдельно полем «Новая сфера» —
   `GET/POST /api/categories/areas`) — нет массового назначения, нет импорта готовой раскладки
-  по сферам, и в отличие от user_categories (`DELETE /api/categories/:category`, кнопка
-  «Удалить» в `CategoryKindsSection`) удаления самой сферы пока нет ни в API, ни в UI.
+  по сферам; переименование категории и сферы есть (`PUT /api/categories/:category`,
+  `PUT /api/categories/areas/:area` — карандаш в `CategoryKindsSection`/`AreaGroupHeader`), но
+  в отличие от user_categories (`DELETE /api/categories/:category`, иконка-корзина в
+  `CategoryKindsSection`) удаления самой сферы пока нет ни в API, ни в UI.
 - `WeekOperationsDialog` (попап операций по клику на ячейку MonthOverview) ограничен `LIMIT = 200`
   без пагинации внутри попапа — при большем числе операций показывается только «первые N из
   total», остальные не видны, пока не сузить период/категорию иначе (например через страницу
