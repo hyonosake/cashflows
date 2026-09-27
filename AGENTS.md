@@ -158,10 +158,11 @@ docs/ARCHITECTURE.md  §1–4 (контекст/стек/структура) и 
 npm run dev              # бек :3000 (tsx watch) + vite :5173; в браузере открывать http://localhost:5173
 npm run build && npm start  # прод: единый процесс на :3000 (UI + API), entry server/dist/server/src/index.js
 npm run typecheck        # tsc --noEmit для server/tsconfig.json И web/tsconfig.json — запускать после ЛЮБЫХ правок
-npm run test             # vitest run — 296 тестов в 19 файлах: test.projects (vitest.config.ts) —
-                          # "web" (17 файлов, web/*.test.ts(x), jsdom) и "server" (2 файла,
+npm run test             # vitest run — 301 тест в 20 файлах: test.projects (vitest.config.ts) —
+                          # "web" (17 файлов, web/*.test.ts(x), jsdom) и "server" (3 файла,
                           # server/src/domain/*.test.ts, node, in-memory SQLite — приоритет
-                          # резолвинга эффективной категории + CRUD mcc/custom-mappings,
+                          # резолвинга эффективной категории на синтетических операциях и на
+                          # реальном samples/sample-operations.csv + CRUD mcc/custom-mappings,
                           # единственные backend-тесты в проекте); test:watch — watch-режим
 npm run import:samples   # импорт samples/*.csv в БД (идемпотентно, тот же domain/import.ts, что HTTP-роут)
 npm run inspect:xlsx     # разведка произвольного xlsx (server/src/scripts/inspect-xlsx.ts [путь]) — исторический
