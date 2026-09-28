@@ -9,12 +9,13 @@ interface Props {
     onSubmit: () => void;
 }
 
-/** Форма «текстовое поле + кнопка добавить» — используется и для новой категории, и для новой сферы. */
+/** Форма «текстовое поле + кнопка добавить» — используется и для новой категории, и для новой сферы.
+ * Кнопка — в `.form-actions` (не внутри `.form-grid`, как остальные формы в приложении): грид
+ * растягивает элементы по умолчанию (`justify-items: stretch`), и кнопка как прямой grid-item
+ * заняла бы половину ширины ряда наравне с полем ввода. */
 export function InlineNameForm({ id, label, placeholder, value, onChange, submitting, submitLabel, onSubmit }: Props): JSX.Element {
     return (
         <form
-            className="form-grid"
-            style={{ marginBottom: 16, alignItems: 'end' }}
             onSubmit={(e) => {
                 e.preventDefault();
                 onSubmit();
@@ -31,9 +32,11 @@ export function InlineNameForm({ id, label, placeholder, value, onChange, submit
                     placeholder={placeholder}
                 />
             </div>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>
-                {submitLabel}
-            </button>
+            <div className="form-actions" style={{ marginTop: 8 }}>
+                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                    {submitLabel}
+                </button>
+            </div>
         </form>
     );
 }

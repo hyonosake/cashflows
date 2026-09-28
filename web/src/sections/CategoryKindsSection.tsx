@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { CategoryKind, CategoryKindDto } from '../../../shared/types';
+import type { CategoryKindDto } from '../../../shared/types';
 import {
     apiErrorText,
     createCategoryArea,
@@ -11,7 +11,6 @@ import {
     setCategoryKind,
     setCategoryLimit,
 } from '../api';
-import { kopecksToRublesInput, parseRublesToKopecks } from '../format';
 import { useCategoryAreas } from '../hooks/useCategoryAreas';
 import { useCategoryFields } from '../hooks/useCategoryFields';
 import { useCategoryKinds } from '../hooks/useCategoryKinds';
@@ -23,18 +22,23 @@ import { ErrorBanner } from '../components/ui/ErrorBanner';
 import { Spinner } from '../components/ui/Spinner';
 import { AreaGroupHeader } from './category-kinds/AreaGroupHeader';
 import { CategoryRow } from './category-kinds/CategoryRow';
+import type { EditCategoryInput } from './category-kinds/EditCategoryDialog';
+import { EditCategoryDialog } from './category-kinds/EditCategoryDialog';
+import { EditAreaDialog } from './category-kinds/EditAreaDialog';
 import { InlineNameForm } from './category-kinds/InlineNameForm';
 
 /**
- * Секция «Настройки категорий» — тег «постоянная/переменная» на категорию (для разбивки
- * расходов на дашборде, ExpenseKindSummary), CategoryField — более абстрактная
- * категория поверх категории пользователя, например «Еда и повседневное» объединяет
- * «Продукты и быт»/«Еда вне дома»/«Табак» (группировка строк матрицы в MonthOverview),
- * и план на месяц (user_categories.month_limit_kopecks — столбцы «План»/«% от плана»
- * той же матрицы). Список категорий для тега/плана — useCategoryKinds(version)/
- * useCategoryLimits(version) (все эффективные категории с расходом, одинаковый набор);
- * CategoryField можно задать только категориям пользователя (useCategoryFields(version) —
- * ровно то, что размечено в «Обзоре месяца»), у остальных строк это поле не показывается.
+ * Секция «Настройки категорий» — плоский список категорий (сгруппированный по сфере
+ * заголовками, как в MonthOverview) + отдельный список сфер как заголовков групп. Строка
+ * категории показывает только название и сводку (тег/сфера/план) в одну строку; все
+ * редактируемые поля — тег «постоянная/переменная/резерв» (для ExpenseKindSummary), сфера
+ * (CategoryField — более абстрактная категория поверх категории пользователя, группирует
+ * строки MonthOverview) и план на месяц (user_categories.month_limit_kopecks — столбцы
+ * «План»/«% от плана» той же матрицы) — редактируются одной формой в попапе EditCategoryDialog
+ * по кнопке «Изменить» (не инлайн построчно, как раньше). Список категорий для тега/плана —
+ * useCategoryKinds(version)/useCategoryLimits(version) (все эффективные категории с расходом,
+ * одинаковый набор); CategoryField можно задать только категориям пользователя
+ * (useCategoryFields(version) — ровно то, что размечено в «Обзоре месяца»).
  *
  * «Новая категория» вверху — ЕДИНСТВЕННОЕ место в приложении, где заводится новая
  * user_categories.name (POST /api/categories, domain/categories.ts → createUserCategory).
@@ -43,9 +47,8 @@ import { InlineNameForm } from './category-kinds/InlineNameForm';
  *
  * «Новая сфера» — аналогично, единственное место, где заводится НОВАЯ category_abstract
  * без привязки к конкретной категории (POST /api/categories/areas, useCategoryAreas(version));
- * назначение сферы категории — строгий SearchableSelect из уже существующих сфер (setCategoryField
- * ниже всё равно умеет find-or-create по имени на сервере, но UI больше не даёт вписать новое
- * имя прямо в поле категории — сначала завести сферу здесь, как и с категориями).
+ * переименование сферы — попап EditAreaDialog по кнопке «Изменить» в заголовке группы
+ * (AreaGroupHeader), у сферы единственное редактируемое поле — имя.
  *
  * «Удалить» у категории — DELETE /api/categories/:category (domain/categories.ts →
  * deleteUserCategory), подтверждается ConfirmDialog (необратимо влияет на много операций
@@ -102,12 +105,12 @@ export function CategoryKindsSection({ version, onDataChanged }: Props): JSX.Ele
         return result;
     }, [kinds, fieldByCategory]);
 
-    const [limitDrafts, setLimitDrafts] = useState<Record<string, string>>({});
-    const [busyCategory, setBusyCategory] = useState<string | null>(null);
-    const [busyFieldCategory, setBusyFieldCategory] = useState<string | null>(null);
-    const [busyLimitCategory, setBusyLimitCategory] = useState<string | null>(null);
-    const [busyRenameCategory, setBusyRenameCategory] = useState<string | null>(null);
-    const [busyRenameArea, setBusyRenameArea] = useState<string | null>(null);
+    const [editingCategory, setEditingCategory] = useState<CategoryKindDto | null>(null);
+    const [savingCategoryEdit, setSavingCategoryEdit] = useState(false);
+    const [categoryEditError, setCategoryEditError] = useState<string | null>(null);
+    const [editingArea, setEditingArea] = useState<string | null>(null);
+    const [savingAreaEdit, setSavingAreaEdit] = useState(false);
+    const [areaEditError, setAreaEditError] = useState<string | null>(null);
     const [newCategoryName, setNewCategoryName] = useState('');
     const [creatingCategory, setCreatingCategory] = useState(false);
     const [newAreaName, setNewAreaName] = useState('');
@@ -153,58 +156,6 @@ export function CategoryKindsSection({ version, onDataChanged }: Props): JSX.Ele
         }
     };
 
-    const handleSetKind = async (category: string, kind: CategoryKind | null): Promise<void> => {
-        setBusyCategory(category);
-        setError(null);
-        try {
-            await setCategoryKind(category, kind);
-            onDataChanged();
-        } catch (e: unknown) {
-            setError(apiErrorText(e, 'Не удалось сохранить тег категории'));
-        } finally {
-            setBusyCategory(null);
-        }
-    };
-
-    const handleSetField = async (category: string, field: string): Promise<void> => {
-        setBusyFieldCategory(category);
-        setError(null);
-        try {
-            await setCategoryField(category, field === '' ? null : field);
-            onDataChanged();
-        } catch (e: unknown) {
-            setError(apiErrorText(e, 'Не удалось сохранить сферу категории'));
-        } finally {
-            setBusyFieldCategory(null);
-        }
-    };
-
-    const handleRenameCategory = async (category: string, newName: string): Promise<void> => {
-        setBusyRenameCategory(category);
-        setError(null);
-        try {
-            await renameUserCategory(category, newName);
-            onDataChanged();
-        } catch (e: unknown) {
-            setError(apiErrorText(e, 'Не удалось переименовать категорию'));
-        } finally {
-            setBusyRenameCategory(null);
-        }
-    };
-
-    const handleRenameArea = async (area: string, newName: string): Promise<void> => {
-        setBusyRenameArea(area);
-        setError(null);
-        try {
-            await renameCategoryArea(area, newName);
-            onDataChanged();
-        } catch (e: unknown) {
-            setError(apiErrorText(e, 'Не удалось переименовать сферу'));
-        } finally {
-            setBusyRenameArea(null);
-        }
-    };
-
     const handleDeleteCategory = async (category: string): Promise<void> => {
         try {
             await deleteUserCategory(category);
@@ -215,35 +166,38 @@ export function CategoryKindsSection({ version, onDataChanged }: Props): JSX.Ele
         }
     };
 
-    const handleSaveLimit = async (category: string): Promise<void> => {
-        const draft = (limitDrafts[category] ?? '').trim();
-        if (draft === '') {
-            setBusyLimitCategory(category);
-            setError(null);
-            try {
-                await setCategoryLimit(category, null);
-                onDataChanged();
-            } catch (e: unknown) {
-                setError(apiErrorText(e, 'Не удалось сохранить план категории'));
-            } finally {
-                setBusyLimitCategory(null);
-            }
-            return;
-        }
-        const monthLimitKopecks = parseRublesToKopecks(draft);
-        if (monthLimitKopecks === null || monthLimitKopecks <= 0) {
-            setError('План должен быть положительным числом, например «15000»');
-            return;
-        }
-        setBusyLimitCategory(category);
-        setError(null);
+    const handleSaveCategoryEdit = async (input: EditCategoryInput): Promise<void> => {
+        if (editingCategory === null) return;
+        setSavingCategoryEdit(true);
+        setCategoryEditError(null);
         try {
-            await setCategoryLimit(category, monthLimitKopecks);
+            const originalName = editingCategory.category;
+            const targetName = input.name !== originalName ? input.name : originalName;
+            if (input.name !== originalName) await renameUserCategory(originalName, input.name);
+            await setCategoryField(targetName, input.field === '' ? null : input.field);
+            await setCategoryKind(targetName, input.kind);
+            await setCategoryLimit(targetName, input.limitKopecks);
             onDataChanged();
+            setEditingCategory(null);
         } catch (e: unknown) {
-            setError(apiErrorText(e, 'Не удалось сохранить план категории'));
+            setCategoryEditError(apiErrorText(e, 'Не удалось сохранить категорию'));
         } finally {
-            setBusyLimitCategory(null);
+            setSavingCategoryEdit(false);
+        }
+    };
+
+    const handleSaveAreaEdit = async (newName: string): Promise<void> => {
+        if (editingArea === null) return;
+        setSavingAreaEdit(true);
+        setAreaEditError(null);
+        try {
+            await renameCategoryArea(editingArea, newName);
+            onDataChanged();
+            setEditingArea(null);
+        } catch (e: unknown) {
+            setAreaEditError(apiErrorText(e, 'Не удалось переименовать сферу'));
+        } finally {
+            setSavingAreaEdit(false);
         }
     };
 
@@ -252,13 +206,13 @@ export function CategoryKindsSection({ version, onDataChanged }: Props): JSX.Ele
     return (
         <CollapsibleSection title="Настройки категорий" defaultOpen={false}>
             <p className="muted" style={{ marginTop: -6, marginBottom: 12 }}>
-                Тег определяет разбивку расходов на дашборде. Категории без тега считаются
-                «не размечено». Сфера — более абстрактная категория поверх категории
-                пользователя (например «Еда и повседневное» объединяет несколько категорий,
-                группирует строки в «Обзоре месяца») — доступна только для категорий,
-                размеченных в «Обзоре месяца», и выбирается из уже созданных сфер (заводится
-                отдельно, полем «Новая сфера» ниже). План на месяц — столбцы «План»/«% от плана»
-                в той же матрице; пустое значение — план не задан.
+                Кнопка «Изменить» у категории открывает попап с названием, сферой, тегом
+                («постоянная/переменная/резерв» — определяет разбивку расходов на дашборде)
+                и планом на месяц (столбцы «План»/«% от плана» в «Обзоре месяца»). Сфера —
+                более абстрактная категория поверх категории пользователя (например «Еда и
+                повседневное» объединяет несколько категорий, группирует строки в «Обзоре
+                месяца») — выбирается из уже созданных сфер (заводится отдельно, полем «Новая
+                сфера» ниже).
             </p>
             {error !== null && <ErrorBanner message={error} />}
             {kindsQuery.error !== null && <ErrorBanner message={kindsQuery.error} />}
@@ -266,27 +220,29 @@ export function CategoryKindsSection({ version, onDataChanged }: Props): JSX.Ele
             {limitsQuery.error !== null && <ErrorBanner message={limitsQuery.error} />}
             {areasQuery.error !== null && <ErrorBanner message={areasQuery.error} />}
 
-            <InlineNameForm
-                id="new-category-name"
-                label="Новая категория"
-                placeholder="Например «Подарки»"
-                value={newCategoryName}
-                onChange={setNewCategoryName}
-                submitting={creatingCategory}
-                submitLabel="Добавить категорию"
-                onSubmit={() => void handleCreateCategory()}
-            />
+            <div className="grid-2">
+                <InlineNameForm
+                    id="new-category-name"
+                    label="Новая категория"
+                    placeholder="Например «Подарки»"
+                    value={newCategoryName}
+                    onChange={setNewCategoryName}
+                    submitting={creatingCategory}
+                    submitLabel="Добавить категорию"
+                    onSubmit={() => void handleCreateCategory()}
+                />
 
-            <InlineNameForm
-                id="new-area-name"
-                label="Новая сфера"
-                placeholder="Например «Еда и повседневное»"
-                value={newAreaName}
-                onChange={setNewAreaName}
-                submitting={creatingArea}
-                submitLabel="Добавить сферу"
-                onSubmit={() => void handleCreateArea()}
-            />
+                <InlineNameForm
+                    id="new-area-name"
+                    label="Новая сфера"
+                    placeholder="Например «Еда и повседневное»"
+                    value={newAreaName}
+                    onChange={setNewAreaName}
+                    submitting={creatingArea}
+                    submitLabel="Добавить сферу"
+                    onSubmit={() => void handleCreateArea()}
+                />
+            </div>
 
             {listLoading ? (
                 <div className="state-box">
@@ -300,50 +256,44 @@ export function CategoryKindsSection({ version, onDataChanged }: Props): JSX.Ele
                         <div key={group.sphere ?? '\u0000without-sphere'}>
                             <AreaGroupHeader
                                 sphere={group.sphere}
-                                renameBusy={busyRenameArea === group.sphere}
-                                onRename={(newName) => {
-                                    if (group.sphere !== null) void handleRenameArea(group.sphere, newName);
+                                onEdit={() => {
+                                    if (group.sphere !== null) setEditingArea(group.sphere);
                                 }}
                             />
-                            {group.items.map((item) => {
-                                const hasField = fieldByCategory.has(item.category);
-                                const savedField = fieldByCategory.get(item.category) ?? '';
-                                const savedLimit = limitByCategory.get(item.category) ?? null;
-                                const limitDraft =
-                                    limitDrafts[item.category] ?? (savedLimit === null ? '' : kopecksToRublesInput(savedLimit));
-                                const savedLimitDraft = savedLimit === null ? '' : kopecksToRublesInput(savedLimit);
-                                const limitChanged = limitDraft.trim() !== savedLimitDraft;
-
-                                return (
-                                    <CategoryRow
-                                        key={item.category}
-                                        item={item}
-                                        renameBusy={busyRenameCategory === item.category}
-                                        onRename={(newName) => void handleRenameCategory(item.category, newName)}
-                                        hasField={hasField}
-                                        savedField={savedField ?? ''}
-                                        areaOptions={areaOptions}
-                                        fieldBusy={busyFieldCategory === item.category}
-                                        onSetField={(field) => void handleSetField(item.category, field)}
-                                        savedLimit={savedLimit}
-                                        limitDraft={limitDraft}
-                                        limitChanged={limitChanged}
-                                        limitBusy={busyLimitCategory === item.category}
-                                        onLimitDraftChange={(value) =>
-                                            setLimitDrafts((prev) => ({ ...prev, [item.category]: value }))
-                                        }
-                                        onSaveLimit={() => void handleSaveLimit(item.category)}
-                                        kindBusy={busyCategory === item.category}
-                                        onSetKind={(kind) => void handleSetKind(item.category, kind)}
-                                        deleteBusy={categoryDelete.busy}
-                                        onRequestDelete={() => categoryDelete.requestDelete(item.category)}
-                                    />
-                                );
-                            })}
+                            {group.items.map((item) => (
+                                <CategoryRow
+                                    key={item.category}
+                                    item={item}
+                                    field={fieldByCategory.get(item.category) ?? ''}
+                                    limitKopecks={limitByCategory.get(item.category) ?? null}
+                                    deleteBusy={categoryDelete.busy}
+                                    onEdit={() => setEditingCategory(item)}
+                                    onRequestDelete={() => categoryDelete.requestDelete(item.category)}
+                                />
+                            ))}
                         </div>
                     ))}
                 </div>
             )}
+
+            <EditCategoryDialog
+                item={editingCategory}
+                initialField={editingCategory !== null ? fieldByCategory.get(editingCategory.category) ?? '' : ''}
+                initialLimitKopecks={editingCategory !== null ? limitByCategory.get(editingCategory.category) ?? null : null}
+                areaOptions={areaOptions}
+                saving={savingCategoryEdit}
+                error={categoryEditError}
+                onCancel={() => setEditingCategory(null)}
+                onSave={(input) => void handleSaveCategoryEdit(input)}
+            />
+
+            <EditAreaDialog
+                area={editingArea}
+                saving={savingAreaEdit}
+                error={areaEditError}
+                onCancel={() => setEditingArea(null)}
+                onSave={(newName) => void handleSaveAreaEdit(newName)}
+            />
 
             <ConfirmDialog
                 open={categoryDelete.pending !== null}

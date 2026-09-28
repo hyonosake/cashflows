@@ -1,149 +1,48 @@
-import { useState } from 'react';
-import type { CategoryKind, CategoryKindDto } from '../../../../shared/types';
+import type { CategoryKindDto } from '../../../../shared/types';
 import { formatMoneyWhole } from '../../format';
 import { PencilIcon } from '../../components/ui/PencilIcon';
-import { SearchableSelect } from '../../components/ui/SearchableSelect';
 import { TrashIcon } from '../../components/ui/TrashIcon';
 
-const KIND_OPTIONS: Array<{ value: string; label: string }> = [
-    { value: 'fixed', label: 'Постоянная' },
-    { value: 'variable', label: 'Переменная' },
-    { value: 'reserve', label: 'Резерв' },
-    { value: '', label: '— (не размечено)' },
-];
+const KIND_LABELS: Record<string, string> = {
+    fixed: 'Постоянная',
+    variable: 'Переменная',
+    reserve: 'Резерв',
+};
 
 interface Props {
     item: CategoryKindDto;
-    renameBusy: boolean;
-    onRename: (newName: string) => void;
-    hasField: boolean;
-    savedField: string;
-    areaOptions: Array<{ value: string; label: string }>;
-    fieldBusy: boolean;
-    onSetField: (field: string) => void;
-    savedLimit: number | null;
-    limitDraft: string;
-    limitChanged: boolean;
-    limitBusy: boolean;
-    onLimitDraftChange: (value: string) => void;
-    onSaveLimit: () => void;
-    kindBusy: boolean;
-    onSetKind: (kind: CategoryKind | null) => void;
+    field: string; // '' — без сферы
+    limitKopecks: number | null;
     deleteBusy: boolean;
+    onEdit: () => void;
     onRequestDelete: () => void;
 }
 
-/** Одна строка списка категорий: название (переименование) + тег + сфера + план на месяц + удаление. */
-export function CategoryRow({
-    item,
-    renameBusy,
-    onRename,
-    hasField,
-    savedField,
-    areaOptions,
-    fieldBusy,
-    onSetField,
-    savedLimit,
-    limitDraft,
-    limitChanged,
-    limitBusy,
-    onLimitDraftChange,
-    onSaveLimit,
-    kindBusy,
-    onSetKind,
-    deleteBusy,
-    onRequestDelete,
-}: Props): JSX.Element {
-    const [editingName, setEditingName] = useState(false);
-    const [nameDraft, setNameDraft] = useState(item.category);
-
-    const startEditingName = (): void => {
-        setNameDraft(item.category);
-        setEditingName(true);
-    };
-
-    const submitRename = (): void => {
-        const trimmed = nameDraft.trim();
-        if (trimmed === '' || trimmed === item.category) {
-            setEditingName(false);
-            return;
-        }
-        onRename(trimmed);
-    };
+/** Одна строка плоского списка категорий: название + сводка тега/сферы/плана, «Изменить» открывает попап. */
+export function CategoryRow({ item, field, limitKopecks, deleteBusy, onEdit, onRequestDelete }: Props): JSX.Element {
+    const parts: string[] = [];
+    parts.push(item.kind !== null && item.kind !== undefined ? KIND_LABELS[item.kind] ?? item.kind : 'не размечено');
+    if (field !== '') parts.push(`сфера «${field}»`);
+    if (limitKopecks !== null) parts.push(`план ${formatMoneyWhole(limitKopecks)}/мес`);
 
     return (
         <div className="entity-item">
             <div className="entity-main">
-                {editingName ? (
-                    <div className="category-field-row">
-                        <input
-                            className="input-control"
-                            aria-label={`Новое имя категории ${item.category}`}
-                            value={nameDraft}
-                            disabled={renameBusy}
-                            autoFocus
-                            onChange={(e) => setNameDraft(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') submitRename();
-                                if (e.key === 'Escape') setEditingName(false);
-                            }}
-                        />
-                        <button type="button" className="btn btn-small" disabled={renameBusy || nameDraft.trim() === ''} onClick={submitRename}>
-                            Сохранить
-                        </button>
-                        <button type="button" className="btn btn-small" disabled={renameBusy} onClick={() => setEditingName(false)}>
-                            Отмена
-                        </button>
-                    </div>
-                ) : (
-                    <div className="entity-title-row">
-                        <span className="entity-title">{item.category}</span>
-                        <button
-                            type="button"
-                            className="btn btn-icon"
-                            onClick={startEditingName}
-                            aria-label={`Переименовать категорию ${item.category}`}
-                            title="Переименовать категорию"
-                        >
-                            <PencilIcon />
-                        </button>
-                    </div>
-                )}
-                {hasField && (
-                    <div className="category-field-row">
-                        <SearchableSelect
-                            value={savedField}
-                            options={areaOptions}
-                            disabled={fieldBusy}
-                            aria-label={`Сфера категории ${item.category}`}
-                            onChange={onSetField}
-                        />
-                    </div>
-                )}
-                <div className="category-field-row">
-                    <input
-                        className="input-control"
-                        placeholder="План на месяц, ₽ (напр. «15000»)"
-                        value={limitDraft}
-                        disabled={limitBusy}
-                        onChange={(e) => onLimitDraftChange(e.target.value)}
-                    />
-                    {limitChanged && (
-                        <button type="button" className="btn btn-small" disabled={limitBusy} onClick={onSaveLimit}>
-                            Сохранить
-                        </button>
-                    )}
-                    {savedLimit !== null && !limitChanged && <span className="muted">{formatMoneyWhole(savedLimit)}/мес</span>}
+                <div className="entity-title-row">
+                    <span className="entity-title">{item.category}</span>
                 </div>
+                <div className="entity-sub">{parts.join(' · ')}</div>
             </div>
             <div className="entity-actions">
-                <SearchableSelect
-                    value={item.kind ?? ''}
-                    options={KIND_OPTIONS}
-                    disabled={kindBusy}
-                    aria-label={`Тег категории ${item.category}`}
-                    onChange={(next) => onSetKind(next === '' ? null : (next as CategoryKind))}
-                />
+                <button
+                    type="button"
+                    className="btn btn-icon"
+                    onClick={onEdit}
+                    aria-label={`Изменить категорию ${item.category}`}
+                    title="Изменить категорию"
+                >
+                    <PencilIcon />
+                </button>
                 <button
                     type="button"
                     className="btn btn-icon btn-danger"

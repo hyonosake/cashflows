@@ -20,20 +20,16 @@ import {
 } from '../api';
 
 /**
- * Секция «Настройки категорий» — тег постоянная/переменная (SearchableSelect, не кнопки —
- * см. AGENTS.md, «Конвенции кода» → UI-паттерны), сфера (CategoryField) И план на месяц
- * (month_limit_kopecks) на категорию, переименование категории/сферы (карандаш →
- * инлайн-форма), «Новая категория» — ЕДИНСТВЕННОЕ место в приложении, где заводится новая
- * user_categories.name (createUserCategory), и «Новая сфера» — аналогично для
- * category_abstract (createCategoryArea). ../api мокается (vi.mock) — без сети; выбор тега/
- * сферы/сохранение плана/переименование шлёт PUT и вызывает onDataChanged, ошибка API
- * рендерится через ErrorBanner. Сфера доступна только категориям из fetchCategoryFields
- * (= пользовательские, см. listUserCategories) — «Такси / метро / самокаты» её не имеет;
- * план и тег — всем категориям из fetchCategoryKinds. Тег/сфера — SearchableSelect
- * (комбобокс с поиском, не нативный select): выбор варианта — клик по инпуту, затем клик по
- * пункту списка (role="option"), не user.selectOptions. «Удалить» у категории — иконка-кнопка
- * (без видимого текста, есть aria-label), подтверждается ConfirmDialog (deleteUserCategory),
- * не window.confirm.
+ * Секция «Настройки категорий» — плоский список (название + сводка тега/сферы/плана в одну
+ * строку), группированный по сфере заголовками. Кнопка «Изменить» у категории открывает попап
+ * (EditCategoryDialog) с полями «Название»/«Сфера»/«Тег»/«План на месяц» одной формой; кнопка
+ * «Изменить» в заголовке группы сферы открывает попап (EditAreaDialog) с одним полем «Название».
+ * ../api мокается (vi.mock) — без сети; сохранение в попапе шлёт нужные PUT (рен­ейм только
+ * если имя изменилось, сфера/тег/план — всегда, идемпотентно) и вызывает onDataChanged, ошибка
+ * API рендерится через ErrorBanner внутри попапа. «Новая категория»/«Новая сфера» — как раньше,
+ * инлайн-формы вверху секции (createUserCategory/createCategoryArea). «Удалить» у категории —
+ * иконка-кнопка (без видимого текста, есть aria-label), подтверждается ConfirmDialog
+ * (deleteUserCategory), не window.confirm.
  */
 
 async function chooseOption(user: UserEvent, input: HTMLElement, optionName: string | RegExp): Promise<void> {
@@ -88,12 +84,15 @@ const limits: CategoryLimitDto[] = [
 beforeEach(() => {
     fetchCategoryKindsMock.mockReset();
     setCategoryKindMock.mockReset();
+    setCategoryKindMock.mockResolvedValue({ category: '', kind: null });
     fetchCategoryFieldsMock.mockReset();
     fetchCategoryFieldsMock.mockResolvedValue(fields);
     setCategoryFieldMock.mockReset();
+    setCategoryFieldMock.mockResolvedValue({ category: '', field: null });
     fetchCategoryLimitsMock.mockReset();
     fetchCategoryLimitsMock.mockResolvedValue(limits);
     setCategoryLimitMock.mockReset();
+    setCategoryLimitMock.mockResolvedValue({ category: '', monthLimitKopecks: null });
     createUserCategoryMock.mockReset();
     deleteUserCategoryMock.mockReset();
     renameUserCategoryMock.mockReset();
@@ -111,95 +110,130 @@ async function expandSection(): Promise<void> {
     await user.click(await screen.findByRole('button', { name: /Настройки категорий/ }));
 }
 
+async function openEditDialog(user: UserEvent, category: string): Promise<HTMLElement> {
+    const item = (await screen.findByText(category)).closest('.entity-item') as HTMLElement;
+    await user.click(within(item).getByRole('button', { name: `Изменить категорию ${category}` }));
+    return screen.findByRole('dialog');
+}
+
 describe('CategoryKindsSection', () => {
-    it('рендерит категории с текущим тегом в выпадашке', async () => {
+    it('рендерит плоский список категорий со сводкой тега/сферы/плана', async () => {
         fetchCategoryKindsMock.mockResolvedValueOnce(kinds);
+        fetchCategoryFieldsMock.mockResolvedValueOnce([{ category: 'Сима', field: 'Дети' }]);
+        fetchCategoryLimitsMock.mockResolvedValueOnce([
+            { category: 'Сима', monthLimitKopecks: 1_500_000 },
+            { category: 'Такси / метро / самокаты', monthLimitKopecks: null },
+        ]);
         render(<CategoryKindsSection version={0} onDataChanged={vi.fn()} />);
         await expandSection();
 
-        expect(await screen.findByText('Сима')).toBeInTheDocument();
-        expect(screen.getByText('Такси / метро / самокаты')).toBeInTheDocument();
+        const simaItem = (await screen.findByText('Сима')).closest('.entity-item') as HTMLElement;
+        expect(simaItem).toHaveTextContent('Постоянная');
+        expect(simaItem).toHaveTextContent('сфера «Дети»');
+        expect(simaItem).toHaveTextContent('план 15 000 ₽/мес');
 
-        const simaKindSelect = screen.getByLabelText('Тег категории Сима') as HTMLInputElement;
-        expect(simaKindSelect.value).toBe('Постоянная');
-        const taxiKindSelect = screen.getByLabelText('Тег категории Такси / метро / самокаты') as HTMLInputElement;
-        expect(taxiKindSelect.value).toBe('— (не размечено)');
+        const taxiItem = screen.getByText('Такси / метро / самокаты').closest('.entity-item') as HTMLElement;
+        expect(taxiItem).toHaveTextContent('не размечено');
+        expect(taxiItem).not.toHaveTextContent('сфера');
+        expect(taxiItem).not.toHaveTextContent('план');
     });
 
-    it('выбор тега в выпадашке шлёт PUT и вызывает onDataChanged', async () => {
+    it('«Изменить» открывает попап с текущими значениями полей', async () => {
         fetchCategoryKindsMock.mockResolvedValueOnce(kinds);
-        setCategoryKindMock.mockResolvedValueOnce({ category: 'Такси / метро / самокаты', kind: 'variable' });
+        fetchCategoryFieldsMock.mockResolvedValueOnce([{ category: 'Сима', field: 'Дети' }]);
+        fetchCategoryLimitsMock.mockResolvedValueOnce([
+            { category: 'Сима', monthLimitKopecks: 1_500_000 },
+            { category: 'Такси / метро / самокаты', monthLimitKopecks: null },
+        ]);
+        const user = userEvent.setup();
+        render(<CategoryKindsSection version={0} onDataChanged={vi.fn()} />);
+        await expandSection();
+
+        const dialog = await openEditDialog(user, 'Сима');
+        expect(within(dialog).getByLabelText('Название')).toHaveValue('Сима');
+        expect(within(dialog).getByLabelText('Сфера')).toHaveValue('Дети');
+        expect(within(dialog).getByLabelText('Тег')).toHaveValue('Постоянная');
+        expect(within(dialog).getByLabelText('План на месяц, ₽')).toHaveValue('15000,00');
+    });
+
+    it('сохранение в попапе шлёт setField/setKind/setLimit и вызывает onDataChanged', async () => {
+        fetchCategoryKindsMock.mockResolvedValueOnce(kinds);
         const onDataChanged = vi.fn();
         const user = userEvent.setup();
         render(<CategoryKindsSection version={0} onDataChanged={onDataChanged} />);
         await expandSection();
 
-        const kindSelect = await screen.findByLabelText('Тег категории Такси / метро / самокаты');
-        await chooseOption(user, kindSelect, 'Переменная');
+        const dialog = await openEditDialog(user, 'Такси / метро / самокаты');
+        await chooseOption(user, within(dialog).getByLabelText('Сфера'), 'Дети');
+        await chooseOption(user, within(dialog).getByLabelText('Тег'), 'Переменная');
+        await user.type(within(dialog).getByLabelText('План на месяц, ₽'), '15000');
+        await user.click(within(dialog).getByRole('button', { name: 'Сохранить' }));
 
+        expect(renameUserCategoryMock).not.toHaveBeenCalled();
+        expect(setCategoryFieldMock).toHaveBeenCalledExactlyOnceWith('Такси / метро / самокаты', 'Дети');
         expect(setCategoryKindMock).toHaveBeenCalledExactlyOnceWith('Такси / метро / самокаты', 'variable');
+        expect(setCategoryLimitMock).toHaveBeenCalledExactlyOnceWith('Такси / метро / самокаты', 1_500_000);
+        await waitFor(() => expect(onDataChanged).toHaveBeenCalledOnce());
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('переименование в попапе шлёт renameUserCategory перед остальными полями', async () => {
+        fetchCategoryKindsMock.mockResolvedValueOnce(kinds);
+        renameUserCategoryMock.mockResolvedValueOnce({ name: 'Транспорт' });
+        const onDataChanged = vi.fn();
+        const user = userEvent.setup();
+        render(<CategoryKindsSection version={0} onDataChanged={onDataChanged} />);
+        await expandSection();
+
+        const dialog = await openEditDialog(user, 'Такси / метро / самокаты');
+        const nameInput = within(dialog).getByLabelText('Название');
+        await user.clear(nameInput);
+        await user.type(nameInput, 'Транспорт');
+        await user.click(within(dialog).getByRole('button', { name: 'Сохранить' }));
+
+        expect(renameUserCategoryMock).toHaveBeenCalledExactlyOnceWith('Такси / метро / самокаты', 'Транспорт');
+        expect(setCategoryFieldMock).toHaveBeenCalledExactlyOnceWith('Транспорт', null);
         await waitFor(() => expect(onDataChanged).toHaveBeenCalledOnce());
     });
 
-    it('ошибка API при сохранении тега → ErrorBanner с текстом ошибки', async () => {
+    it('некорректный план в попапе — локальная ошибка без вызова API', async () => {
+        fetchCategoryKindsMock.mockResolvedValueOnce(kinds);
+        const user = userEvent.setup();
+        render(<CategoryKindsSection version={0} onDataChanged={vi.fn()} />);
+        await expandSection();
+
+        const dialog = await openEditDialog(user, 'Сима');
+        await user.type(within(dialog).getByLabelText('План на месяц, ₽'), '-5');
+        await user.click(within(dialog).getByRole('button', { name: 'Сохранить' }));
+
+        expect(await within(dialog).findByText(/План должен быть положительным числом/)).toBeInTheDocument();
+        expect(setCategoryLimitMock).not.toHaveBeenCalled();
+    });
+
+    it('ошибка API при сохранении попапа → ErrorBanner внутри попапа', async () => {
         fetchCategoryKindsMock.mockResolvedValueOnce(kinds);
         setCategoryKindMock.mockRejectedValueOnce(new ApiError(400, 'Ошибка валидации запроса'));
         const user = userEvent.setup();
         render(<CategoryKindsSection version={0} onDataChanged={vi.fn()} />);
         await expandSection();
 
-        const kindSelect = await screen.findByLabelText('Тег категории Такси / метро / самокаты');
-        await chooseOption(user, kindSelect, 'Постоянная');
+        const dialog = await openEditDialog(user, 'Такси / метро / самокаты');
+        await user.click(within(dialog).getByRole('button', { name: 'Сохранить' }));
 
-        expect(await screen.findByText('Ошибка валидации запроса')).toBeInTheDocument();
+        expect(await within(dialog).findByText('Ошибка валидации запроса')).toBeInTheDocument();
     });
 
-    it('сфера показывается только для категорий пользователя; план — у всех', async () => {
+    it('Отмена в попапе закрывает его без вызова API', async () => {
         fetchCategoryKindsMock.mockResolvedValueOnce(kinds);
+        const user = userEvent.setup();
         render(<CategoryKindsSection version={0} onDataChanged={vi.fn()} />);
         await expandSection();
 
-        const simaItem = (await screen.findByText('Сима')).closest('.entity-item') as HTMLElement;
-        const taxiItem = screen.getByText('Такси / метро / самокаты').closest('.entity-item') as HTMLElement;
+        const dialog = await openEditDialog(user, 'Сима');
+        await user.click(within(dialog).getByRole('button', { name: 'Отмена' }));
 
-        expect(simaItem.querySelector('[aria-label="Сфера категории Сима"]')).toBeInTheDocument();
-        expect(taxiItem.querySelector('[aria-label^="Сфера категории"]')).not.toBeInTheDocument();
-
-        expect(simaItem.querySelector('input[placeholder^="План"]')).toBeInTheDocument();
-        expect(taxiItem.querySelector('input[placeholder^="План"]')).toBeInTheDocument();
-    });
-
-    it('сохранение плана шлёт PUT и вызывает onDataChanged', async () => {
-        fetchCategoryKindsMock.mockResolvedValueOnce(kinds);
-        setCategoryLimitMock.mockResolvedValueOnce({ category: 'Сима', monthLimitKopecks: 1_500_000 });
-        const onDataChanged = vi.fn();
-        const user = userEvent.setup();
-        render(<CategoryKindsSection version={0} onDataChanged={onDataChanged} />);
-        await expandSection();
-
-        const simaItem = (await screen.findByText('Сима')).closest('.entity-item') as HTMLElement;
-        const limitInput = simaItem.querySelector('input[placeholder^="План"]') as HTMLElement;
-        await user.type(limitInput, '15000');
-        const saveBtn = Array.from(simaItem.querySelectorAll('button')).find((b) => b.textContent === 'Сохранить') as HTMLElement;
-        await user.click(saveBtn);
-
-        expect(setCategoryLimitMock).toHaveBeenCalledExactlyOnceWith('Сима', 1_500_000);
-        await waitFor(() => expect(onDataChanged).toHaveBeenCalledOnce());
-    });
-
-    it('выбор сферы шлёт PUT и вызывает onDataChanged', async () => {
-        fetchCategoryKindsMock.mockResolvedValueOnce(kinds);
-        setCategoryFieldMock.mockResolvedValueOnce({ category: 'Сима', field: 'Дети' });
-        const onDataChanged = vi.fn();
-        const user = userEvent.setup();
-        render(<CategoryKindsSection version={0} onDataChanged={onDataChanged} />);
-        await expandSection();
-
-        const fieldSelect = await screen.findByLabelText('Сфера категории Сима');
-        await chooseOption(user, fieldSelect, 'Дети');
-
-        expect(setCategoryFieldMock).toHaveBeenCalledExactlyOnceWith('Сима', 'Дети');
-        await waitFor(() => expect(onDataChanged).toHaveBeenCalledOnce());
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(setCategoryKindMock).not.toHaveBeenCalled();
     });
 
     it('создание новой сферы шлёт POST и вызывает onDataChanged', async () => {
@@ -322,41 +356,7 @@ describe('CategoryKindsSection', () => {
         expect(await screen.findByText('Нельзя удалить служебную категорию «Без категории»')).toBeInTheDocument();
     });
 
-    it('переименование категории: карандаш → инлайн-форма → PUT и onDataChanged', async () => {
-        fetchCategoryKindsMock.mockResolvedValueOnce(kinds);
-        renameUserCategoryMock.mockResolvedValueOnce({ name: 'Транспорт' });
-        const onDataChanged = vi.fn();
-        const user = userEvent.setup();
-        render(<CategoryKindsSection version={0} onDataChanged={onDataChanged} />);
-        await expandSection();
-
-        const taxiItem = (await screen.findByText('Такси / метро / самокаты')).closest('.entity-item') as HTMLElement;
-        await user.click(within(taxiItem).getByRole('button', { name: 'Переименовать категорию Такси / метро / самокаты' }));
-
-        const input = within(taxiItem).getByDisplayValue('Такси / метро / самокаты');
-        await user.clear(input);
-        await user.type(input, 'Транспорт');
-        await user.click(within(taxiItem).getByRole('button', { name: 'Сохранить' }));
-
-        expect(renameUserCategoryMock).toHaveBeenCalledExactlyOnceWith('Такси / метро / самокаты', 'Транспорт');
-        await waitFor(() => expect(onDataChanged).toHaveBeenCalledOnce());
-    });
-
-    it('переименование категории: Отмена в инлайн-форме не шлёт PUT', async () => {
-        fetchCategoryKindsMock.mockResolvedValueOnce(kinds);
-        const user = userEvent.setup();
-        render(<CategoryKindsSection version={0} onDataChanged={vi.fn()} />);
-        await expandSection();
-
-        const simaItem = (await screen.findByText('Сима')).closest('.entity-item') as HTMLElement;
-        await user.click(within(simaItem).getByRole('button', { name: 'Переименовать категорию Сима' }));
-        await user.click(within(simaItem).getByRole('button', { name: 'Отмена' }));
-
-        expect(screen.getByText('Сима')).toBeInTheDocument();
-        expect(renameUserCategoryMock).not.toHaveBeenCalled();
-    });
-
-    it('переименование сферы: карандаш в заголовке группы → PUT и onDataChanged', async () => {
+    it('переименование сферы: «Изменить» в заголовке группы → попап → PUT и onDataChanged', async () => {
         fetchCategoryKindsMock.mockResolvedValueOnce(kinds);
         fetchCategoryFieldsMock.mockResolvedValueOnce([{ category: 'Сима', field: 'Дети' }]);
         renameCategoryAreaMock.mockResolvedValueOnce({ name: 'Семья' });
@@ -365,22 +365,23 @@ describe('CategoryKindsSection', () => {
         render(<CategoryKindsSection version={0} onDataChanged={onDataChanged} />);
         await expandSection();
 
-        await user.click(await screen.findByRole('button', { name: 'Переименовать сферу Дети' }));
-        const input = screen.getByLabelText('Новое имя сферы Дети');
+        await user.click(await screen.findByRole('button', { name: 'Изменить сферу Дети' }));
+        const dialog = await screen.findByRole('dialog');
+        const input = within(dialog).getByLabelText('Название');
         await user.clear(input);
         await user.type(input, 'Семья');
-        await user.click(screen.getByRole('button', { name: 'Сохранить' }));
+        await user.click(within(dialog).getByRole('button', { name: 'Сохранить' }));
 
         expect(renameCategoryAreaMock).toHaveBeenCalledExactlyOnceWith('Дети', 'Семья');
         await waitFor(() => expect(onDataChanged).toHaveBeenCalledOnce());
     });
 
-    it('«Без сферы» — псевдо-группа без кнопки переименования', async () => {
+    it('«Без сферы» — псевдо-группа без кнопки «Изменить»', async () => {
         fetchCategoryKindsMock.mockResolvedValueOnce(kinds);
         render(<CategoryKindsSection version={0} onDataChanged={vi.fn()} />);
         await expandSection();
 
         expect(await screen.findByText('Без сферы')).toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: 'Переименовать сферу Без сферы' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Изменить сферу Без сферы' })).not.toBeInTheDocument();
     });
 });

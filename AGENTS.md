@@ -86,19 +86,27 @@ web/               React SPA (Vite, root web/), 4 таба (App.tsx): Дашбо
                    CategoryKindsSection (контейнер «Настройки категорий»: считает группировку
                    по сфере + рендерит category-kinds/InlineNameForm дважды («Новая категория»/
                    «Новая сфера» — идентичная форма), category-kinds/AreaGroupHeader на каждую
-                   группу (заголовок сферы + инлайн-переименование, PUT /api/categories/areas/:area,
-                   кроме псевдо-группы «Без сферы» — переименовывать нечего) и один
-                   category-kinds/CategoryRow на категорию — инлайн-переименование (карандаш,
-                   PUT /api/categories/:category), тег fixed/variable/reserve выпадашкой
-                   (SearchableSelect, не кнопки), «сфера» (SearchableSelect из category_abstract,
-                   заводится отдельно полем «Новая сфера» — GET/POST /api/categories/areas, без
-                   привязки к конкретной категории), «План на месяц» = month_limit_kopecks,
-                   «Удалить» иконкой (TrashIcon) с ConfirmDialog (useConfirmDelete) — DELETE
-                   /api/categories/:category, кроме служебной «Без категории» (её нельзя ни
-                   удалить, ни переименовать, ни переименовать ДРУГУЮ категорию в неё —
-                   domain/categories.ts → renameUserCategory/deleteUserCategory); список
-                   сгруппирован по сфере заголовками (алфавит сферы, категории без сферы —
-                   блоком «Без сферы» в конце), как строки MonthOverview)
+                   группу (заголовок сферы, плоский — только название; кнопка «Изменить»
+                   открывает category-kinds/EditAreaDialog, попап с единственным полем «Название»,
+                   PUT /api/categories/areas/:area, кроме псевдо-группы «Без сферы» —
+                   переименовывать нечего) и один category-kinds/CategoryRow на категорию —
+                   плоская строка (название + сводка тег/сфера/план текстом в одну строку,
+                   без интерактивных контролов); кнопка «Изменить» открывает
+                   category-kinds/EditCategoryDialog, попап-форма сразу с четырьмя полями —
+                   «Название» (переименование, PUT /api/categories/:category), «Сфера»
+                   (SearchableSelect из category_abstract, заводится отдельно полем «Новая
+                   сфера» — GET/POST /api/categories/areas, без привязки к конкретной
+                   категории), «Тег» (SearchableSelect fixed/variable/reserve, не кнопки) и
+                   «План на месяц» (month_limit_kopecks); одно «Сохранить» шлёт rename (только
+                   если имя изменилось) и PUT сферы/тега/плана (всегда, идемпотентно) —
+                   контейнер не различает, какое поле реально поменялось. «Удалить» — отдельная
+                   иконка (TrashIcon) в строке списка, вне попапа, с ConfirmDialog
+                   (useConfirmDelete) — DELETE /api/categories/:category, кроме служебной «Без
+                   категории» (её нельзя ни удалить, ни переименовать, ни переименовать ДРУГУЮ
+                   категорию в неё — domain/categories.ts → renameUserCategory/
+                   deleteUserCategory); список сгруппирован по сфере заголовками (алфавит
+                   сферы, категории без сферы — блоком «Без сферы» в конце), как строки
+                   MonthOverview)
   components/      MonthOverview (матрица категория×неделя: Категория | План | Неделя 1..N |
                    Потрачено | % от плана, группировка по category_abstract со строкой «Итого»;
                    любая сумма кликабельна, включая «0 ₽» и «Итого» — недельная открывает
@@ -167,7 +175,7 @@ data/              cashflows.sqlite (+ -wal/-shm); в .gitignore
 npm run dev              # бек :3000 (tsx watch) + vite :5173; в браузере открывать http://localhost:5173
 npm run build && npm start  # прод: единый процесс на :3000 (UI + API), entry server/dist/server/src/index.js
 npm run typecheck        # tsc --noEmit для server/tsconfig.json И web/tsconfig.json — запускать после ЛЮБЫХ правок
-npm run test             # vitest run — 320 тестов в 22 файлах: test.projects (vitest.config.ts) —
+npm run test             # vitest run — 319 тестов в 22 файлах: test.projects (vitest.config.ts) —
                           # "web" (17 файлов, web/*.test.ts(x), jsdom) и "server" (5 файлов,
                           # server/src/domain/*.test.ts, node, in-memory SQLite — приоритет
                           # резолвинга эффективной категории на синтетических операциях и на
@@ -345,12 +353,21 @@ EXISTS` + `CREATE VIEW` при каждом старте достаточно. �
   - Аккордеон (`CollapsibleSection`) — шеврон (`ChevronIcon`), поворачивается на 90° при
     раскрытии; уже реализовано, не переизобретать для новых сворачиваемых блоков — оборачивать
     в тот же компонент.
-  - Инлайн-переименование (категория/сфера — `CategoryRow`/`AreaGroupHeader`) — паттерн: иконка
-    «карандаш» переключает текст на `<input>` + «Сохранить»/«Отмена» тут же на месте (не модалка,
-    не отдельная страница), Enter сохраняет, Escape отменяет; состояние редактирования — локальный
-    `useState` компонента строки, сама мутация и её busy/error — у контейнера секции (тот же
-    принцип, что и `useConfirmDelete`/`useCreateRule` — UI-состояние живёт как можно ближе к
-    разметке, состояние данных/сети — в контейнере).
+  - Редактирование записи списка (категория, сфера — `CategoryRow`/`AreaGroupHeader`) — паттерн:
+    строка списка плоская (только название + для категории сводка тег/сфера/план текстом), без
+    интерактивных контролов в самой строке; иконка «карандаш» открывает попап (`EditCategoryDialog`/
+    `EditAreaDialog`, `.modal`/`.modal-overlay`, как `ConfirmDialog`/`CreateRuleDialog`) с формой всех
+    редактируемых полей сразу, Escape/клик по подложке отменяет, «Сохранить» отправляет все PUT'ы
+    одной пачкой (rename — только если имя изменилось, остальные поля — всегда, идемпотентно);
+    состояние формы (драфты полей, локальная валидация) — локальный `useState` диалога, какая
+    запись сейчас редактируется и сама мутация/busy/error — у контейнера секции (тот же принцип,
+    что и `useConfirmDelete`/`useCreateRule` — UI-состояние живёт как можно ближе к разметке,
+    состояние данных/сети — в контейнере). Поле внутри `SearchableSelect`, вложенное в `.field`
+    через промежуточный `.searchable-select`-div, не растягивается на 100% автоматически (в отличие
+    от обычного `<input>` — прямого flex-ребёнка `.field`, которого тянет `align-items: stretch`) —
+    для него ширина 100% задана явно (`.searchable-select input.input-control`), иначе в узкой
+    grid-колонке (`.form-grid`, несколько полей в ряд, как в `EditCategoryDialog`) инпут вылезает
+    за рамки модалки своим intrinsic-размером.
 - Тесты (vitest + Testing Library): файлы `*.test.ts(x)` рядом с исходником; глобали vitest НЕ включены —
   явные импорты `describe/it/expect/vi` из `'vitest'`; тесты без сети — `fetch`/`web/src/api.ts` мокаются
   (`vi.stubGlobal('fetch')`, `vi.mock`), сервер :3000 не запускается. Конфиг — `vitest.config.ts`

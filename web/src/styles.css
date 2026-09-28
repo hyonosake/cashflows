@@ -688,6 +688,11 @@ body {
     display: flex;
     flex-direction: column;
     gap: 4px;
+    /* Грид-ячейка (.form-grid) по умолчанию min-width:auto — не сжимается уже своего
+       min-content, из-за чего узкая колонка (напр. 2 в ряд в EditCategoryDialog) может
+       раздуть .form-grid шире модалки. min-width:0 разрешает ячейке сжаться до
+       заданной колонки, длинный текст в поле переносится обычным overflow инпута. */
+    min-width: 0;
 }
 
 .field label {
@@ -1009,6 +1014,12 @@ body {
 }
 
 .searchable-select input.input-control {
+    /* Инпут внутри .searchable-select лежит в обычном (не flex/grid) потоке, поэтому
+       не наследует stretch-растяжение родителя (.field) — без явной ширины браузер
+       использует intrinsic-размер текстового поля (~20 символов), который уже одной
+       такой строкой уже шире узкой grid-колонки (.form-grid) и вылезает за рамки
+       попапа (EditCategoryDialog: 4 поля по 2 в ряд). */
+    width: 100%;
     padding-right: 26px;
 }
 
